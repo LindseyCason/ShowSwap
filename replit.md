@@ -12,6 +12,8 @@ ShowSwap is a social app where friends recommend TV shows via swipeable cards. U
 - ✅ **Lists**: Currently Watching, Watch Later, Watched with ratings
 - ✅ **Enhanced Dashboard**: Dynamic sections with currently watching, recently watched, and top compatible friends
 - ✅ **Friends System**: Compatibility scoring based on shared shows and similar ratings
+- ✅ **Friend Search**: Live search functionality with 'contains' text matching (limit 10 users)
+- ✅ **Friend Management**: Add/remove friends with bidirectional relationships
 - ✅ **Smart Navigation**: Dashboard buttons link to specific My Lists tabs
 - ✅ **Toast Notifications**: Success/error feedback on form submissions
 - 📅 **Completed**: September 7, 2025
