@@ -1,0 +1,98 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id            String   @id @default(cuid())
+  username      String   @unique
+  avatarUrl     String?
+  createdAt     DateTime @default(now())
+  // relations
+  friendsA      Friendship[] @relation("UserA")
+  friendsB      Friendship[] @relation("UserB")
+  shows         UserShow[]
+  ratings       Rating[]
+  sessions      Session[]
+  compatScoresA Compatibility[] @relation("UserA_Compat")
+  compatScoresB Compatibility[] @relation("UserB_Compat")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
+
+model Friendship {
+  id       String @id @default(cuid())
+  userAId  String
+  userBId  String
+  userA    User   @relation("UserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB    User   @relation("UserB", fields: [userBId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([userAId, userBId])
+}
+
+model Show {
+  id          String   @id @default(cuid())
+  title       String
+  platform    String
+  posterUrl   String?
+  createdAt   DateTime @default(now())
+  userShows   UserShow[]
+  ratings     Rating[]
+  // for basic dedupe
+  @@index([title, platform])
+}
+
+model UserShow {
+  id          String   @id @default(cuid())
+  userId      String
+  showId      String
+  addedAt     DateTime @default(now())
+  // the status chosen when added by this user (Watched/ToWatch)
+  initialStatus Status
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  show        Show     @relation(fields: [showId], references: [id], onDelete: Cascade)
+  @@unique([userId, showId])
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  userId    String
+  showId    String
+  stars     Int      // 1..5
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  show      Show     @relation(fields: [showId], references: [id], onDelete: Cascade)
+  @@unique([userId, showId])
+}
+
+model Compatibility {
+  id        String   @id @default(cuid())
+  userAId   String
+  userBId   String
+  score     Int      // 1..100
+  updatedAt DateTime @updatedAt
+  userA     User     @relation("UserA_Compat", fields: [userAId], references: [id], onDelete: Cascade)
+  userB     User     @relation("UserB_Compat", fields: [userBId], references: [id], onDelete: Cascade)
+  @@unique([userAId, userBId])
+}
+
+enum Status {
+  ToWatch
+  Watched
+  WatchingNow
+  WatchLater
+}
