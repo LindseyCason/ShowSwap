@@ -89,7 +89,13 @@
                             <option value="Apple TV+">Apple TV+</option>
                             <option value="Amazon Prime">Amazon Prime</option>
                             <option value="Disney+">Disney+</option>
+                            <option value="Other">Other</option>
                         </select>
+                        <div id="custom-platform-section" class="hidden mt-2">
+                            <input type="text" id="custom-platform" placeholder="Enter platform name..." maxlength="50" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <p class="text-sm text-gray-500 mt-1">Max 50 characters</p>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
@@ -311,6 +317,22 @@
             });
         });
 
+        // Platform dropdown change handler
+        document.getElementById('show-platform').addEventListener('change', (e) => {
+            const customSection = document.getElementById('custom-platform-section');
+            const customInput = document.getElementById('custom-platform');
+            
+            if (e.target.value === 'Other') {
+                customSection.classList.remove('hidden');
+                customInput.required = true;
+                customInput.focus();
+            } else {
+                customSection.classList.add('hidden');
+                customInput.required = false;
+                customInput.value = '';
+            }
+        });
+
         document.addEventListener('click', (e) => {
             if (e.target.classList.contains('heart-btn')) {
                 e.preventDefault();
@@ -349,7 +371,9 @@
             e.preventDefault();
             
             const title = document.getElementById('show-title').value;
-            const platform = document.getElementById('show-platform').value;
+            const platformDropdown = document.getElementById('show-platform').value;
+            const customPlatform = document.getElementById('custom-platform').value;
+            const platform = platformDropdown === 'Other' ? customPlatform : platformDropdown;
             const status = document.querySelector('input[name="status"]:checked').value;
             const rating = status === 'Watched' ? selectedRating : null;
             
@@ -368,9 +392,11 @@
                 selectedRating = 0;
                 updateHearts(0); // Reset hearts to black
                 document.getElementById('rating-section').classList.add('hidden');
+                document.getElementById('custom-platform-section').classList.add('hidden');
+                document.getElementById('custom-platform').required = false;
                 
-                // Reset radio buttons to default (Currently Watching)
-                document.querySelector('input[value="Currently Watching"]').checked = true;
+                // Reset radio buttons to default (Watch Later)
+                document.querySelector('input[value="WatchLater"]').checked = true;
             }
         });
 
