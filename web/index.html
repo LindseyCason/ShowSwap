@@ -111,11 +111,11 @@
                     <div id="rating-section" class="hidden">
                         <label class="block text-sm font-medium text-gray-700 mb-2">Rating</label>
                         <div class="flex space-x-1">
-                            <button type="button" class="star-btn text-2xl text-gray-300 hover:text-yellow-400" data-rating="1">⭐</button>
-                            <button type="button" class="star-btn text-2xl text-gray-300 hover:text-yellow-400" data-rating="2">⭐</button>
-                            <button type="button" class="star-btn text-2xl text-gray-300 hover:text-yellow-400" data-rating="3">⭐</button>
-                            <button type="button" class="star-btn text-2xl text-gray-300 hover:text-yellow-400" data-rating="4">⭐</button>
-                            <button type="button" class="star-btn text-2xl text-gray-300 hover:text-yellow-400" data-rating="5">⭐</button>
+                            <button type="button" class="star-btn text-2xl text-gray-400 hover:text-yellow-500" data-rating="1">⭐</button>
+                            <button type="button" class="star-btn text-2xl text-gray-400 hover:text-yellow-500" data-rating="2">⭐</button>
+                            <button type="button" class="star-btn text-2xl text-gray-400 hover:text-yellow-500" data-rating="3">⭐</button>
+                            <button type="button" class="star-btn text-2xl text-gray-400 hover:text-yellow-500" data-rating="4">⭐</button>
+                            <button type="button" class="star-btn text-2xl text-gray-400 hover:text-yellow-500" data-rating="5">⭐</button>
                         </div>
                         <input type="hidden" id="show-rating" value="">
                     </div>
@@ -323,11 +323,11 @@
         function updateStars(rating) {
             document.querySelectorAll('.star-btn').forEach((btn, index) => {
                 if (index < rating) {
-                    btn.classList.remove('text-gray-300');
-                    btn.classList.add('text-yellow-400');
+                    btn.classList.remove('text-gray-400');
+                    btn.classList.add('text-yellow-500');
                 } else {
-                    btn.classList.remove('text-yellow-400');
-                    btn.classList.add('text-gray-300');
+                    btn.classList.remove('text-yellow-500');
+                    btn.classList.add('text-gray-400');
                 }
             });
         }
