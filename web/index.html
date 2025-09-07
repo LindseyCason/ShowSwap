@@ -167,10 +167,23 @@
 
         <!-- Friends Screen -->
         <div id="friends-screen" class="hidden max-w-4xl mx-auto px-4 py-8">
-            <div class="bg-white rounded-lg shadow-lg p-6">
-                <h2 class="text-xl font-bold mb-4">Friends Compatibility</h2>
-                <div id="friends-content" class="text-gray-500">
-                    Loading friends...
+            <div class="space-y-6">
+                <!-- Add Friends Section -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-xl font-bold mb-4">Add Friends</h2>
+                    <div class="mb-4">
+                        <input type="text" id="friend-search" placeholder="Search for friends by username..." 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div id="search-results" class="space-y-2"></div>
+                </div>
+
+                <!-- Friends Compatibility Section -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-xl font-bold mb-4">Friends Compatibility</h2>
+                    <div id="friends-content" class="text-gray-500">
+                        Loading friends...
+                    </div>
                 </div>
             </div>
         </div>
@@ -334,6 +347,24 @@
             document.getElementById('nav-friends').addEventListener('click', () => {
                 showMainScreen('friends-screen');
                 loadFriendsData();
+            });
+
+            // Friend search functionality
+            let searchTimeout;
+            document.getElementById('friend-search').addEventListener('input', (e) => {
+                const query = e.target.value.trim();
+                
+                // Clear previous timeout
+                if (searchTimeout) clearTimeout(searchTimeout);
+                
+                // Debounce search
+                searchTimeout = setTimeout(() => {
+                    if (query.length >= 1) {
+                        searchFriends(query);
+                    } else {
+                        document.getElementById('search-results').innerHTML = '';
+                    }
+                }, 300);
             });
 
             // Add show form status change
@@ -587,6 +618,76 @@
         function showFriendProfile(friendId) {
             showMainScreen('friends-screen');
             loadFriendsData();
+        }
+
+        // Friend search and management functions
+        async function searchFriends(query) {
+            try {
+                const response = await fetch(`/api/friends/search?query=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                
+                displaySearchResults(data.users);
+            } catch (error) {
+                console.error('Failed to search friends:', error);
+                document.getElementById('search-results').innerHTML = `
+                    <p class="text-red-500 text-sm">Failed to search friends</p>
+                `;
+            }
+        }
+
+        function displaySearchResults(users) {
+            const container = document.getElementById('search-results');
+            
+            if (users.length === 0) {
+                container.innerHTML = `
+                    <p class="text-gray-500 text-sm text-center py-4">No users found matching your search</p>
+                `;
+                return;
+            }
+            
+            container.innerHTML = users.map(user => `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                            ${user.username.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <h4 class="font-medium text-gray-900">${user.username}</h4>
+                            <p class="text-xs text-gray-500">Joined ${new Date(user.createdAt).toLocaleDateString()}</p>
+                        </div>
+                    </div>
+                    <button onclick="addFriend('${user.id}', '${user.username}')" 
+                            class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        Add Friend
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        async function addFriend(friendId, friendUsername) {
+            try {
+                const response = await fetch('/api/friends/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ friendId })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast(`You are now friends with ${friendUsername}!`);
+                    
+                    // Clear search and refresh friends list
+                    document.getElementById('friend-search').value = '';
+                    document.getElementById('search-results').innerHTML = '';
+                    loadFriendsData();
+                } else {
+                    showToast(data.error || 'Failed to add friend', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to add friend:', error);
+                showToast('Failed to add friend', 'error');
+            }
         }
 
         // Load friends data
