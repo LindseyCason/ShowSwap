@@ -311,6 +311,113 @@ app.post('/api/action/watched', (req, res) => {
   }
 });
 
+// Dashboard API endpoint
+app.get('/api/dashboard', (req, res) => {
+  try {
+    const userId = req.session?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const userShowList = userShows.get(userId) || [];
+    
+    // Get currently watching shows (most recent first)
+    const currentlyWatching = userShowList
+      .filter(us => us.initialStatus === 'WatchingNow')
+      .map(userShow => {
+        const show = shows.get(userShow.showId);
+        return show ? { ...show, addedAt: userShow.addedAt } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt));
+
+    // Get watched shows (most recent first)
+    const watchedShows = userShowList
+      .filter(us => us.initialStatus === 'Watched')
+      .map(userShow => {
+        const show = shows.get(userShow.showId);
+        if (!show) return null;
+        
+        const ratingKey = `${userId}:${show.id}`;
+        const rating = ratings.get(ratingKey);
+        
+        return {
+          ...show,
+          addedAt: userShow.addedAt,
+          rating: rating ? rating.stars : null
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt));
+
+    // Generate mock friends data with compatibility
+    const currentUser = Array.from(users.values()).find(u => u.id === userId);
+    const otherUsers = Array.from(users.values()).filter(u => u.id !== userId);
+    
+    const compatibleFriends = otherUsers.map(friend => {
+      // Calculate compatibility based on shared shows and similar ratings
+      const friendShows = userShows.get(friend.id) || [];
+      const userWatchedShows = userShowList.filter(us => us.initialStatus === 'Watched');
+      const friendWatchedShows = friendShows.filter(us => us.initialStatus === 'Watched');
+      
+      let sharedShows = 0;
+      let ratingDifferences = [];
+      
+      userWatchedShows.forEach(userShow => {
+        const friendShow = friendWatchedShows.find(fs => fs.showId === userShow.showId);
+        if (friendShow) {
+          sharedShows++;
+          
+          const userRating = ratings.get(`${userId}:${userShow.showId}`)?.stars || 0;
+          const friendRating = ratings.get(`${friend.id}:${friendShow.showId}`)?.stars || 0;
+          
+          if (userRating && friendRating) {
+            ratingDifferences.push(Math.abs(userRating - friendRating));
+          }
+        }
+      });
+      
+      // Calculate compatibility score (0-100)
+      let compatibility = 0;
+      if (sharedShows > 0) {
+        const avgRatingDiff = ratingDifferences.length > 0 
+          ? ratingDifferences.reduce((a, b) => a + b, 0) / ratingDifferences.length 
+          : 0;
+        
+        // Higher shared shows = higher compatibility, lower rating differences = higher compatibility
+        compatibility = Math.min(100, (sharedShows * 20) + (Math.max(0, 25 - (avgRatingDiff * 5))));
+      }
+      
+      return {
+        id: friend.id,
+        username: friend.username,
+        compatibility: Math.round(compatibility),
+        sharedShows
+      };
+    })
+    .sort((a, b) => b.compatibility - a.compatibility)
+    .slice(0, 5); // Top 5
+
+    res.json({
+      currentlyWatching: {
+        recent: currentlyWatching[0] || null,
+        total: currentlyWatching.length,
+        hasMore: currentlyWatching.length > 1
+      },
+      recentlyWatched: {
+        recent: watchedShows[0] || null,
+        total: watchedShows.length,
+        hasMore: watchedShows.length > 1
+      },
+      compatibleFriends: compatibleFriends
+    });
+
+  } catch (error) {
+    console.error('Dashboard error:', error);
+    res.status(500).json({ error: 'Failed to get dashboard data' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 ShowSwap full-stack app running on port ${PORT}`);
   console.log(`🌐 Frontend: http://localhost:${PORT}`);
