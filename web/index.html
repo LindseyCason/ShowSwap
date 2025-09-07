@@ -323,12 +323,16 @@
 
         function updateStars(rating) {
             document.querySelectorAll('.star-btn').forEach((btn, index) => {
+                console.log(`Updating star ${index + 1}, should be ${index < rating ? 'gold' : 'grey'}`);
+                // Remove both classes first
+                btn.classList.remove('text-gray-400', 'text-yellow-500');
+                
                 if (index < rating) {
-                    btn.classList.remove('text-gray-400');
                     btn.classList.add('text-yellow-500');
+                    btn.style.color = '#eab308'; // Fallback gold color
                 } else {
-                    btn.classList.remove('text-yellow-500');
                     btn.classList.add('text-gray-400');
+                    btn.style.color = '#9ca3af'; // Fallback grey color
                 }
             });
         }
