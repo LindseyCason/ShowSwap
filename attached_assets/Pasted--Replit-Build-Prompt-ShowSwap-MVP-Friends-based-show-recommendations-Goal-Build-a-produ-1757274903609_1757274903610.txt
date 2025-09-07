@@ -1,0 +1,269 @@
+# Replit Build Prompt — “ShowSwap” MVP (Friends-based show recommendations)
+
+**Goal:** Build a production-ready MVP of **ShowSwap**, a social app where friends recommend TV shows via swipeable cards. Users can add shows, browse friends’ decks, mark Watching Now / Watched / Watch Later, rate shows, and see a compatibility score with each friend after both have rated at least 3 mutual shows.
+
+### Tech Stack (opinionated for fast shipping on Replit)
+
+* **Frontend:** React + Vite + TypeScript + TailwindCSS
+* **Backend:** Node.js + Express (TypeScript)
+* **DB:** SQLite via Prisma ORM (file-based, perfect for Replit)
+* **Auth (MVP):** Email-less username login (demo), simple session cookie (express-session + SQLite store). (Swap to OAuth/Supabase later.)
+* **State Mgmt:** React Query for server state; lightweight local state with Context.
+* **Build/Run:** Single Replit with concurrent dev scripts (concurrently) or two repls—either is fine.
+
+### High-Level UX
+
+1. **Auth:** Create username → land on Dashboard.
+2. **Dashboard:**
+
+   * Friends list ordered by **compatibility score** (desc).
+   * Each friend row: avatar, username, compatibility %, tap → friend’s **Deck**.
+3. **Deck (Friend’s shows):**
+
+   * Cards show **poster (placeholder ok), title, platform, “added by friend” timestamp**.
+   * **Swipe left** → send to bottom of deck (skip).
+   * **Swipe right** → open **Show Details** modal.
+4. **Show Details:**
+
+   * Buttons: **Watching Now**, **Watched (requires rating 1–5)**, **Watch Later**.
+   * If marked **Watched**, prompt for rating (stars).
+5. **My Lists:** tabs for **Currently Watching**, **Watch Later**, **Watched** (with my rating).
+6. **Add Show:** title (required), platform (required), status (Watched/To Watch). If Watched → mandatory rating.
+7. **Card Sort:** Friend’s deck ordered by **most recently added** first.
+8. **Ratings on Cards:** If **both** friends rated a show, show two compact badges with each user’s rating (e.g., “You: ★★★★☆ · Alex: ★★★☆☆”).
+
+### Compatibility Formula (MVP)
+
+* Only compute when two users have **≥ 3 mutual shows** both rated.
+* For each mutual rated show, compute absolute difference: `|r1 - r2|` (ratings in \[1..5]).
+* Mean Absolute Difference (MAD) ∈ \[0..4].
+* **Compatibility = round(100 \* (1 - MAD / 4))**.
+* Example: Perfect alignment MAD=0 → 100%. Always 2 stars apart MAD=2 → 50%.
+
+### Data Model (Prisma)
+
+```prisma
+model User {
+  id            String   @id @default(cuid())
+  username      String   @unique
+  avatarUrl     String?
+  createdAt     DateTime @default(now())
+  // relations
+  friendsA      Friendship[] @relation("A")
+  friendsB      Friendship[] @relation("B")
+  shows         UserShow[]
+  ratings       Rating[]
+  sessions      Session[]
+  compatScoresA Compatibility[] @relation("UA")
+  compatScoresB Compatibility[] @relation("UB")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  token     String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
+
+model Friendship {
+  id       String @id @default(cuid())
+  userAId  String
+  userBId  String
+  userA    User   @relation("A", fields: [userAId], references: [id])
+  userB    User   @relation("B", fields: [userBId], references: [id])
+  // status accepted only in MVP
+  createdAt DateTime @default(now())
+  @@unique([userAId, userBId])
+}
+
+model Show {
+  id          String   @id @default(cuid())
+  title       String
+  platform    String
+  posterUrl   String?
+  createdAt   DateTime @default(now())
+  // for basic dedupe
+  @@index([title, platform])
+}
+
+model UserShow {
+  id          String   @id @default(cuid())
+  userId      String
+  showId      String
+  addedAt     DateTime @default(now())
+  // the status chosen when added by this user (Watched/ToWatch)
+  initialStatus Status
+  user        User     @relation(fields: [userId], references: [id])
+  show        Show     @relation(fields: [showId], references: [id])
+  @@unique([userId, showId])
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  userId    String
+  showId    String
+  stars     Int      // 1..5
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  show      Show     @relation(fields: [showId], references: [id])
+  @@unique([userId, showId])
+}
+
+model Compatibility {
+  id        String   @id @default(cuid())
+  userAId   String
+  userBId   String
+  score     Int      // 1..100
+  updatedAt DateTime @updatedAt
+  userA     User     @relation("UA", fields: [userAId], references: [id])
+  userB     User     @relation("UB", fields: [userBId], references: [id])
+  @@unique([userAId, userBId])
+}
+
+enum Status {
+  ToWatch
+  Watched
+  WatchingNow
+  WatchLater // persisted list choice
+}
+```
+
+### API Contract (Express, JSON)
+
+**Auth**
+
+* `POST /api/auth/login` `{ username }` → sets session cookie, returns `{ user }`.
+* `POST /api/auth/logout` → clears session.
+
+**Users & Friends**
+
+* `GET /api/me` → current user.
+* `GET /api/friends` → list with `{ id, username, avatarUrl, compatibility? }` sorted by compatibility desc (null last).
+* `POST /api/friends/add` `{ username }` → create friendship (symmetric in MVP if user exists).
+
+**Shows**
+
+* `POST /api/shows` `{ title, platform, posterUrl?, initialStatus, rating? }`
+
+  * If `initialStatus === "Watched"` → `rating` (1..5) required.
+  * Creates `Show` (or reuse existing) + `UserShow` (link to current user) + optional `Rating`.
+* `GET /api/my/lists` → `{ watchingNow: Show[], watchLater: Show[], watched: ShowWithMyRating[] }`
+
+**Decks**
+
+* `GET /api/decks/:friendId` → friend’s **UserShow** list ordered by `addedAt DESC` with merged info: `{ showId, title, platform, posterUrl, friendRating?, myRating? }`.
+* `POST /api/decks/:friendId/swipe` `{ showId, direction }`
+
+  * `left` → server returns next card order (client can also handle locally; server stores per-user deck pointer optional).
+  * `right` → return full show details.
+
+**Show Details Actions (from deck)**
+
+* `POST /api/action/watching-now` `{ showId }`
+* `POST /api/action/watched` `{ showId, rating }` (1..5 required)
+* `POST /api/action/watch-later` `{ showId }`
+
+**Ratings & Compatibility**
+
+* `GET /api/ratings/:showId/peers/:friendId` → `{ myRating, friendRating }` (if both rated).
+* Nightly job or on-write trigger: **recompute compatibility** for (user, friend) when either rates a show and there are ≥3 mutual rated shows:
+
+  * Fetch mutual ratings → MAD → score; upsert `Compatibility`.
+
+### Frontend Routes/Components
+
+* `/login` – barebones username form.
+* `/` – **Dashboard**: friends sorted by compatibility; “Add Show” button.
+* `/add` – Add Show form (title, platform select, status radio; rating stars conditional).
+* `/friend/:id` – **Deck** view with swipeable cards (use `react-swipeable`), inline “rated by both” badge if available.
+* `/lists` – three tabs: **Currently Watching**, **Watch Later**, **Watched** (with my stars).
+* **UI components**: `Card`, `StarRating`, `FriendRow`, `Deck`, `ShowDetailsModal`, `Tabs`, `Badge`.
+
+### Acceptance Criteria (MVP)
+
+* Can create a user and session.
+* Can add a friend and see them on Dashboard.
+* Can add shows (Watched or To Watch). If Watched → must rate.
+* Visiting a friend shows deck ordered with most recent first.
+* Swiping left re-orders the deck (moves card to bottom). Swiping right opens details.
+* From details, the three actions update my lists correctly.
+* If both friends rate a show, both ratings appear on the card in the deck.
+* After 3+ mutual rated shows, compatibility score is computed (1–100) and appears on Dashboard & friend profile.
+* Dashboard sorted by compatibility desc (ties: recent interaction first; otherwise alphabetical).
+
+### Nice-to-Haves (build if time allows)
+
+* Seed posters via OMDb placeholder or solid color initials.
+* Activity feed (“Alex added *The Bear*”).
+* Debounced search when adding a show.
+
+### Scripts & Project Structure
+
+```
+/app
+  /server
+    src/index.ts
+    src/routes/*.ts
+    src/lib/compat.ts
+    src/middleware/auth.ts
+    prisma/schema.prisma
+  /web
+    index.html
+    src/main.tsx
+    src/App.tsx
+    src/pages/{Login,Dashboard,AddShow,Deck,Lists}.tsx
+    src/components/{Card,Deck,StarRating,FriendRow,Modal,Tabs,Badge}.tsx
+    tailwind.config.cjs
+    postcss.config.cjs
+package.json (workspaces: server, web)
+```
+
+**NPM scripts (root):**
+
+```json
+{
+  "scripts": {
+    "postinstall": "cd server && npm i && npx prisma generate && cd ../web && npm i",
+    "dev": "concurrently \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "cd server && ts-node-dev src/index.ts",
+    "dev:web": "cd web && vite",
+    "build": "npm run build:server && npm run build:web",
+    "build:server": "cd server && tsc",
+    "build:web": "cd web && vite build",
+    "prisma:migrate": "cd server && npx prisma migrate dev --name init",
+    "prisma:studio": "cd server && npx prisma studio"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
+```
+
+### Seed Data (for quick demo)
+
+* Seed 3 users: `lindsey`, `alex`, `sam`.
+* Make `lindsey` ↔ `alex` friends.
+* Insert shows: *The Bear* (Hulu), *Watchmen* (Max), *Stranger Things* (Netflix), *Severance* (Apple TV+).
+* Give both users at least 3 overlapping ratings to showcase compatibility.
+
+### Testing (happy paths only)
+
+* Endpoint tests with supertest for: add show (Watched validation), deck ordering, actions update lists, rating both sides reveals two badges, compatibility computed correctly for sample data.
+
+### Visual Design Notes
+
+* Clean, rounded cards (Tailwind: `rounded-2xl`, `shadow-lg`, generous spacing).
+* Use badges for platform and for dual ratings (e.g., `You ★★★★`, `Alex ★★★☆`).
+* Swipe affordances: subtle left/right arrows beneath the card; dot indicator for deck position.
+* Colors minimal; let posters carry color (use placeholders if none).
+
+### Deliverables
+
+* Running Replit with:
+
+  * Working REST API + SQLite DB (Prisma).
+  * React UI implementing flows above.
+  * Seed script that populates demo data on first run.
+  * Clear README with run steps.
