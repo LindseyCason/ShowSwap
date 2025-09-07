@@ -311,13 +311,14 @@
             });
         });
 
-        document.querySelectorAll('.star-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('star-btn')) {
                 e.preventDefault();
                 selectedRating = parseInt(e.target.dataset.rating);
                 document.getElementById('show-rating').value = selectedRating;
                 updateStars(selectedRating);
-            });
+                console.log('Star clicked:', selectedRating);
+            }
         });
 
         function updateStars(rating) {
