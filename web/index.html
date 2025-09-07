@@ -309,86 +309,137 @@
             }
         }
 
-        // Wait for DOM to be ready
+        // Event listeners setup after DOM loads
         document.addEventListener('DOMContentLoaded', () => {
-            // Event listeners
+            // Login form
             document.getElementById('login-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const username = document.getElementById('username').value;
                 await login(username);
             });
 
-        document.getElementById('logout-btn').addEventListener('click', logout);
+            // Logout button
+            document.getElementById('logout-btn').addEventListener('click', logout);
 
-        // Navigation
-        document.getElementById('nav-dashboard').addEventListener('click', () => {
-            showMainScreen('dashboard-screen');
-            loadDashboardData();
-        });
-        document.getElementById('nav-add-show').addEventListener('click', () => showMainScreen('add-show-screen'));
-        document.getElementById('nav-my-lists').addEventListener('click', () => {
-            showMainScreen('my-lists-screen');
-            loadMyLists();
-        });
-        document.getElementById('nav-friends').addEventListener('click', () => {
-            showMainScreen('friends-screen');
-            loadFriendsData();
-        });
+            // Navigation
+            document.getElementById('nav-dashboard').addEventListener('click', () => {
+                showMainScreen('dashboard-screen');
+                loadDashboardData();
+            });
+            document.getElementById('nav-add-show').addEventListener('click', () => showMainScreen('add-show-screen'));
+            document.getElementById('nav-my-lists').addEventListener('click', () => {
+                showMainScreen('my-lists-screen');
+                loadMyLists();
+            });
+            document.getElementById('nav-friends').addEventListener('click', () => {
+                showMainScreen('friends-screen');
+                loadFriendsData();
+            });
 
-        // Add show form
-        document.querySelectorAll('input[name="status"]').forEach(radio => {
-            radio.addEventListener('change', (e) => {
-                const ratingSection = document.getElementById('rating-section');
-                if (e.target.value === 'Watched') {
-                    ratingSection.classList.remove('hidden');
+            // Add show form status change
+            document.querySelectorAll('input[name="status"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    const ratingSection = document.getElementById('rating-section');
+                    if (e.target.value === 'Watched') {
+                        ratingSection.classList.remove('hidden');
+                    } else {
+                        ratingSection.classList.add('hidden');
+                        selectedRating = 0;
+                        updateHearts(0);
+                    }
+                });
+            });
+
+            // Platform dropdown change handler
+            document.getElementById('show-platform').addEventListener('change', (e) => {
+                const customSection = document.getElementById('custom-platform-section');
+                const customInput = document.getElementById('custom-platform');
+                
+                if (e.target.value === 'Other') {
+                    customSection.classList.remove('hidden');
+                    customInput.required = true;
+                    customInput.focus();
                 } else {
-                    ratingSection.classList.add('hidden');
+                    customSection.classList.add('hidden');
+                    customInput.required = false;
+                    customInput.value = '';
+                }
+            });
+
+            // Heart rating clicks
+            document.addEventListener('click', (e) => {
+                if (e.target.classList.contains('heart-btn')) {
+                    e.preventDefault();
+                    selectedRating = parseInt(e.target.dataset.rating);
+                    updateHearts(selectedRating);
+                    console.log('Heart clicked:', selectedRating);
+                }
+            });
+
+            // Add show form submission
+            document.getElementById('add-show-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const title = document.getElementById('show-title').value;
+                const platformDropdown = document.getElementById('show-platform').value;
+                const customPlatform = document.getElementById('custom-platform').value;
+                const platform = platformDropdown === 'Other' ? customPlatform : platformDropdown;
+                const status = document.querySelector('input[name="status"]:checked').value;
+                const rating = status === 'Watched' ? selectedRating : null;
+                
+                if (status === 'Watched' && !rating) {
+                    showToast('Please select a rating for watched shows', 'error');
+                    return;
+                }
+                
+                const result = await addShow(title, platform, status, rating);
+                
+                if (result.show) {
+                    showToast('Show added successfully!');
+                    
+                    // Clear form completely
+                    document.getElementById('add-show-form').reset();
                     selectedRating = 0;
                     updateHearts(0);
+                    document.getElementById('rating-section').classList.add('hidden');
+                    document.getElementById('custom-platform-section').classList.add('hidden');
+                    document.getElementById('custom-platform').required = false;
+                    
+                    // Reset radio buttons to default (Watch Later)
+                    document.querySelector('input[value="WatchLater"]').checked = true;
+                    
+                    // Refresh dashboard if we're currently viewing it
+                    if (!document.getElementById('dashboard-screen').classList.contains('hidden')) {
+                        loadDashboardData();
+                    }
                 }
+            });
+
+            // My Lists tabs
+            document.getElementById('tab-watching').addEventListener('click', () => {
+                showListTab('watching-now-list', 'tab-watching');
+            });
+            
+            document.getElementById('tab-later').addEventListener('click', () => {
+                showListTab('watch-later-list', 'tab-later');
+            });
+            
+            document.getElementById('tab-watched').addEventListener('click', () => {
+                showListTab('watched-list', 'tab-watched');
             });
         });
 
-        // Platform dropdown change handler
-        document.getElementById('show-platform').addEventListener('change', (e) => {
-            const customSection = document.getElementById('custom-platform-section');
-            const customInput = document.getElementById('custom-platform');
-            
-            if (e.target.value === 'Other') {
-                customSection.classList.remove('hidden');
-                customInput.required = true;
-                customInput.focus();
-            } else {
-                customSection.classList.add('hidden');
-                customInput.required = false;
-                customInput.value = '';
-            }
-        });
-
-        document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('heart-btn')) {
-                e.preventDefault();
-                selectedRating = parseInt(e.target.dataset.rating);
-                document.getElementById('show-rating').value = selectedRating;
-                updateHearts(selectedRating);
-                console.log('Heart clicked:', selectedRating);
-            }
-        });
-        }); // End DOMContentLoaded
-
+        // Utility functions
         function updateHearts(rating) {
             document.querySelectorAll('.heart-btn').forEach((btn, index) => {
-                console.log(`Updating heart ${index + 1}, should be ${index < rating ? 'red' : 'grey'}`);
-                
                 if (index < rating) {
                     btn.textContent = '❤️'; // Red heart emoji
                 } else {
-                    btn.textContent = '🖤'; // Grey heart emoji
+                    btn.textContent = '🖤'; // Grey heart emoji  
                 }
             });
         }
 
-        // Toast function
         function showToast(message, type = 'success') {
             const toast = document.createElement('div');
             toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 ${type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`;
@@ -400,42 +451,7 @@
             }, 3000);
         }
 
-        // Move remaining event listeners inside DOMContentLoaded
-        document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('add-show-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const title = document.getElementById('show-title').value;
-            const platformDropdown = document.getElementById('show-platform').value;
-            const customPlatform = document.getElementById('custom-platform').value;
-            const platform = platformDropdown === 'Other' ? customPlatform : platformDropdown;
-            const status = document.querySelector('input[name="status"]:checked').value;
-            const rating = status === 'Watched' ? selectedRating : null;
-            
-            if (status === 'Watched' && !rating) {
-                showToast('Please select a rating for watched shows', 'error');
-                return;
-            }
-            
-            const result = await addShow(title, platform, status, rating);
-            
-            if (result.show) {
-                showToast('Show added successfully!');
-                
-                // Clear form completely
-                document.getElementById('add-show-form').reset();
-                selectedRating = 0;
-                updateHearts(0); // Reset hearts to black
-                document.getElementById('rating-section').classList.add('hidden');
-                document.getElementById('custom-platform-section').classList.add('hidden');
-                document.getElementById('custom-platform').required = false;
-                
-                // Reset radio buttons to default (Watch Later)
-                document.querySelector('input[value="WatchLater"]').checked = true;
-            }
-        });
-
-        // Load dashboard data
+        // Dashboard functions
         async function loadDashboardData() {
             try {
                 const response = await fetch('/api/dashboard');
@@ -446,6 +462,10 @@
                 populateCompatibleFriends(data.compatibleFriends);
             } catch (error) {
                 console.error('Failed to load dashboard data:', error);
+                // Show error state
+                document.getElementById('currently-watching-content').innerHTML = '<p class="text-red-500">Failed to load data</p>';
+                document.getElementById('recently-watched-content').innerHTML = '<p class="text-red-500">Failed to load data</p>';
+                document.getElementById('compatible-friends-content').innerHTML = '<p class="text-red-500">Failed to load data</p>';
             }
         }
 
@@ -647,35 +667,7 @@
             `;
         }
 
-        // My Lists tabs
-        document.getElementById('tab-watching').addEventListener('click', () => {
-            showListTab('watching-now-list', 'tab-watching');
-        });
-        
-        document.getElementById('tab-later').addEventListener('click', () => {
-            showListTab('watch-later-list', 'tab-later');
-        });
-        
-        document.getElementById('tab-watched').addEventListener('click', () => {
-            showListTab('watched-list', 'tab-watched');
-        });
-
-        // Test API button
-        document.getElementById('test-api-btn').addEventListener('click', async () => {
-            try {
-                // Test adding some shows
-                await addShow('Severance', 'Apple TV+', 'Watched', 5);
-                await addShow('Watchmen', 'HBO Max', 'WatchLater');
-                await addShow('The Office', 'Netflix', 'WatchingNow');
-                
-                alert('Test data added! Check "My Lists" to see the results.');
-                loadMyLists();
-            } catch (error) {
-                alert('Error testing API: ' + error.message);
-            }
-        });
-        }); // End second DOMContentLoaded
-
+        // List tab function
         function showListTab(listId, tabId) {
             document.querySelectorAll('#watching-now-list, #watch-later-list, #watched-list').forEach(el => el.classList.add('hidden'));
             document.getElementById(listId).classList.remove('hidden');
