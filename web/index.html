@@ -50,20 +50,31 @@
 
         <!-- Dashboard -->
         <div id="dashboard-screen" class="max-w-4xl mx-auto px-4 py-8">
-            <div class="bg-white rounded-lg shadow-lg p-6">
-                <h2 class="text-xl font-bold mb-4">Dashboard</h2>
-                <div class="text-center py-8">
-                    <h3 class="text-lg font-semibold text-gray-700 mb-2">Welcome to ShowSwap!</h3>
-                    <p class="text-gray-600 mb-4">Your friend-based show recommendation app is running perfectly.</p>
-                    <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                        <p class="text-green-700">✅ Backend API connected and working</p>
-                        <p class="text-green-700">✅ User authentication system active</p>
-                        <p class="text-green-700">✅ Show management fully functional</p>
-                        <p class="text-green-700">✅ Rating system operational</p>
+            <div class="space-y-6">
+                <h2 class="text-2xl font-bold text-gray-900">Dashboard</h2>
+                
+                <!-- Currently Watching Section -->
+                <div id="currently-watching-section" class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Currently Watching</h3>
+                    <div id="currently-watching-content" class="text-gray-500">
+                        Loading...
                     </div>
-                    <button id="test-api-btn" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-                        Test API Functions
-                    </button>
+                </div>
+                
+                <!-- Recently Watched Section -->
+                <div id="recently-watched-section" class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Recently Watched</h3>
+                    <div id="recently-watched-content" class="text-gray-500">
+                        Loading...
+                    </div>
+                </div>
+                
+                <!-- Top Compatible Friends Section -->
+                <div id="compatible-friends-section" class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Top Compatible Friends</h3>
+                    <div id="compatible-friends-content" class="text-gray-500">
+                        Loading...
+                    </div>
                 </div>
             </div>
         </div>
@@ -296,7 +307,10 @@
         document.getElementById('logout-btn').addEventListener('click', logout);
 
         // Navigation
-        document.getElementById('nav-dashboard').addEventListener('click', () => showMainScreen('dashboard-screen'));
+        document.getElementById('nav-dashboard').addEventListener('click', () => {
+            showMainScreen('dashboard-screen');
+            loadDashboardData();
+        });
         document.getElementById('nav-add-show').addEventListener('click', () => showMainScreen('add-show-screen'));
         document.getElementById('nav-my-lists').addEventListener('click', () => {
             showMainScreen('my-lists-screen');
@@ -399,6 +413,140 @@
                 document.querySelector('input[value="WatchLater"]').checked = true;
             }
         });
+
+        // Load dashboard data
+        async function loadDashboardData() {
+            try {
+                const response = await fetch('/api/dashboard');
+                const data = await response.json();
+                
+                populateCurrentlyWatching(data.currentlyWatching);
+                populateRecentlyWatched(data.recentlyWatched);
+                populateCompatibleFriends(data.compatibleFriends);
+            } catch (error) {
+                console.error('Failed to load dashboard data:', error);
+            }
+        }
+
+        function populateCurrentlyWatching(currentlyWatching) {
+            const content = document.getElementById('currently-watching-content');
+            
+            if (!currentlyWatching.recent) {
+                content.innerHTML = `
+                    <div class="text-center py-4">
+                        <p class="text-gray-500">No shows currently watching</p>
+                        <button onclick="showMainScreen('add-show-screen')" class="mt-2 text-blue-600 hover:text-blue-800">Add a show</button>
+                    </div>
+                `;
+                return;
+            }
+            
+            content.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                        <h4 class="font-medium text-gray-900">${currentlyWatching.recent.title}</h4>
+                        <p class="text-sm text-gray-600">${currentlyWatching.recent.platform}</p>
+                        <p class="text-xs text-gray-500">Added ${new Date(currentlyWatching.recent.addedAt).toLocaleDateString()}</p>
+                    </div>
+                    ${currentlyWatching.hasMore ? `
+                        <button onclick="showMyListsTab('watching-now-list')" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                            Show More (${currentlyWatching.total})
+                        </button>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function populateRecentlyWatched(recentlyWatched) {
+            const content = document.getElementById('recently-watched-content');
+            
+            if (!recentlyWatched.recent) {
+                content.innerHTML = `
+                    <div class="text-center py-4">
+                        <p class="text-gray-500">No shows watched yet</p>
+                        <button onclick="showMainScreen('add-show-screen')" class="mt-2 text-blue-600 hover:text-blue-800">Add a watched show</button>
+                    </div>
+                `;
+                return;
+            }
+            
+            const stars = '❤️'.repeat(recentlyWatched.recent.rating || 0) + '🖤'.repeat(5 - (recentlyWatched.recent.rating || 0));
+            
+            content.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                        <h4 class="font-medium text-gray-900">${recentlyWatched.recent.title}</h4>
+                        <p class="text-sm text-gray-600">${recentlyWatched.recent.platform}</p>
+                        <p class="text-sm">${stars}</p>
+                        <p class="text-xs text-gray-500">Watched ${new Date(recentlyWatched.recent.addedAt).toLocaleDateString()}</p>
+                    </div>
+                    ${recentlyWatched.hasMore ? `
+                        <button onclick="showMyListsTab('watched-list')" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                            More (${recentlyWatched.total})
+                        </button>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function populateCompatibleFriends(friends) {
+            const content = document.getElementById('compatible-friends-content');
+            
+            if (friends.length === 0) {
+                content.innerHTML = `
+                    <div class="text-center py-4">
+                        <p class="text-gray-500">No friends to show compatibility with</p>
+                        <p class="text-xs text-gray-400 mt-1">Add friends to see compatibility scores</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            content.innerHTML = `
+                <div class="space-y-3">
+                    ${friends.map(friend => `
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div class="flex-1">
+                                <h4 class="font-medium text-gray-900">${friend.username}</h4>
+                                <p class="text-sm text-gray-600">${friend.sharedShows} shared shows</p>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <span class="text-lg font-bold text-green-600">${friend.compatibility}%</span>
+                                <button onclick="showFriendProfile('${friend.id}')" class="text-blue-600 hover:text-blue-800 text-sm">
+                                    View Profile
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="mt-4 text-center">
+                    <button onclick="showMainScreen('friends-screen')" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                        View All Friends
+                    </button>
+                </div>
+            `;
+        }
+
+        // Navigation helpers
+        function showMyListsTab(tabName) {
+            showMainScreen('my-lists-screen');
+            // Activate the specific tab
+            setTimeout(() => {
+                const tabMap = {
+                    'watching-now-list': 'tab-watching',
+                    'watched-list': 'tab-watched'
+                };
+                const tabId = tabMap[tabName];
+                if (tabId) {
+                    showListTab(tabName, tabId);
+                }
+            }, 100);
+        }
+
+        function showFriendProfile(friendId) {
+            // For now, show friends screen - will be enhanced later
+            showMainScreen('friends-screen');
+        }
 
         // My Lists tabs
         document.getElementById('tab-watching').addEventListener('click', () => {
