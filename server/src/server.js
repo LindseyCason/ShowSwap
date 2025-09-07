@@ -11,6 +11,7 @@ const users = new Map();
 const shows = new Map();
 const userShows = new Map(); // userId -> [showIds]
 const ratings = new Map(); // userId:showId -> rating
+const friendships = new Map(); // userId -> Set of friend userIds
 
 // Middleware
 app.use(cors({
@@ -311,6 +312,96 @@ app.post('/api/action/watched', (req, res) => {
   }
 });
 
+// Friend search API endpoint
+app.get('/api/friends/search', (req, res) => {
+  try {
+    const userId = req.session?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { query } = req.query;
+    if (!query || query.length < 1) {
+      return res.json({ users: [] });
+    }
+
+    const currentUserFriends = friendships.get(userId) || new Set();
+    const searchResults = Array.from(users.values())
+      .filter(user => 
+        user.id !== userId && // Don't include current user
+        !currentUserFriends.has(user.id) && // Don't include existing friends
+        user.username.toLowerCase().includes(query.toLowerCase()) // Contains search
+      )
+      .slice(0, 10) // Limit to 10 results
+      .map(user => ({
+        id: user.id,
+        username: user.username,
+        createdAt: user.createdAt
+      }));
+
+    res.json({ users: searchResults });
+  } catch (error) {
+    console.error('Friend search error:', error);
+    res.status(500).json({ error: 'Failed to search friends' });
+  }
+});
+
+// Add friend API endpoint
+app.post('/api/friends/add', (req, res) => {
+  try {
+    const userId = req.session?.userId;
+    const { friendId } = req.body;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    if (!friendId) {
+      return res.status(400).json({ error: 'Friend ID required' });
+    }
+
+    if (userId === friendId) {
+      return res.status(400).json({ error: 'Cannot add yourself as friend' });
+    }
+
+    const friend = Array.from(users.values()).find(u => u.id === friendId);
+    if (!friend) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Add bidirectional friendship
+    if (!friendships.has(userId)) {
+      friendships.set(userId, new Set());
+    }
+    if (!friendships.has(friendId)) {
+      friendships.set(friendId, new Set());
+    }
+
+    const userFriends = friendships.get(userId);
+    const friendFriends = friendships.get(friendId);
+
+    // Check if already friends
+    if (userFriends.has(friendId)) {
+      return res.status(400).json({ error: 'Already friends' });
+    }
+
+    userFriends.add(friendId);
+    friendFriends.add(userId);
+
+    res.json({ 
+      success: true, 
+      message: `You are now friends with ${friend.username}`,
+      friend: {
+        id: friend.id,
+        username: friend.username
+      }
+    });
+  } catch (error) {
+    console.error('Add friend error:', error);
+    res.status(500).json({ error: 'Failed to add friend' });
+  }
+});
+
 // Dashboard API endpoint
 app.get('/api/dashboard', (req, res) => {
   try {
@@ -350,11 +441,12 @@ app.get('/api/dashboard', (req, res) => {
       .filter(Boolean)
       .sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt));
 
-    // Generate mock friends data with compatibility
+    // Get actual friends data with compatibility
     const currentUser = Array.from(users.values()).find(u => u.id === userId);
-    const otherUsers = Array.from(users.values()).filter(u => u.id !== userId);
+    const userFriends = friendships.get(userId) || new Set();
+    const friendUsers = Array.from(users.values()).filter(u => userFriends.has(u.id));
     
-    const compatibleFriends = otherUsers.map(friend => {
+    const compatibleFriends = friendUsers.map(friend => {
       // Calculate compatibility based on shared shows and similar ratings
       const friendShows = userShows.get(friend.id) || [];
       const userWatchedShows = userShowList.filter(us => us.initialStatus === 'Watched');
