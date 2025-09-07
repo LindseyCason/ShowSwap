@@ -204,7 +204,7 @@
             if (result.user) {
                 currentUser = result.user;
                 showScreen('main-app');
-                loadMyLists();
+                loadDashboardData(); // Load dashboard data on login
                 return true;
             }
             return false;
@@ -309,12 +309,14 @@
             }
         }
 
-        // Event listeners
-        document.getElementById('login-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const username = document.getElementById('username').value;
-            await login(username);
-        });
+        // Wait for DOM to be ready
+        document.addEventListener('DOMContentLoaded', () => {
+            // Event listeners
+            document.getElementById('login-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const username = document.getElementById('username').value;
+                await login(username);
+            });
 
         document.getElementById('logout-btn').addEventListener('click', logout);
 
@@ -372,6 +374,7 @@
                 console.log('Heart clicked:', selectedRating);
             }
         });
+        }); // End DOMContentLoaded
 
         function updateHearts(rating) {
             document.querySelectorAll('.heart-btn').forEach((btn, index) => {
@@ -397,6 +400,8 @@
             }, 3000);
         }
 
+        // Move remaining event listeners inside DOMContentLoaded
+        document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('add-show-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -655,20 +660,6 @@
             showListTab('watched-list', 'tab-watched');
         });
 
-        function showListTab(listId, tabId) {
-            document.querySelectorAll('#watching-now-list, #watch-later-list, #watched-list').forEach(el => el.classList.add('hidden'));
-            document.getElementById(listId).classList.remove('hidden');
-            
-            document.querySelectorAll('#tab-watching, #tab-later, #tab-watched').forEach(el => {
-                el.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
-                el.classList.add('text-gray-600');
-            });
-            
-            const activeTab = document.getElementById(tabId);
-            activeTab.classList.remove('text-gray-600');
-            activeTab.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
-        }
-
         // Test API button
         document.getElementById('test-api-btn').addEventListener('click', async () => {
             try {
@@ -683,6 +674,21 @@
                 alert('Error testing API: ' + error.message);
             }
         });
+        }); // End second DOMContentLoaded
+
+        function showListTab(listId, tabId) {
+            document.querySelectorAll('#watching-now-list, #watch-later-list, #watched-list').forEach(el => el.classList.add('hidden'));
+            document.getElementById(listId).classList.remove('hidden');
+            
+            document.querySelectorAll('#tab-watching, #tab-later, #tab-watched').forEach(el => {
+                el.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+                el.classList.add('text-gray-600');
+            });
+            
+            const activeTab = document.getElementById(tabId);
+            activeTab.classList.remove('text-gray-600');
+            activeTab.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+        }
     </script>
 </body>
 </html>

@@ -8,9 +8,12 @@ ShowSwap is a social app where friends recommend TV shows via swipeable cards. U
 - ✅ **Frontend**: Complete HTML/JavaScript UI with Tailwind CSS styling
 - ✅ **Backend**: Comprehensive API with all core functionality
 - ✅ **Authentication**: Username-only login with session management
-- ✅ **Show management**: Add, rate, and organize shows
+- ✅ **Show management**: Add, rate, and organize shows with custom platforms
 - ✅ **Lists**: Currently Watching, Watch Later, Watched with ratings
-- ✅ **Testing**: Built-in API test functionality
+- ✅ **Enhanced Dashboard**: Dynamic sections with currently watching, recently watched, and top compatible friends
+- ✅ **Friends System**: Compatibility scoring based on shared shows and similar ratings
+- ✅ **Smart Navigation**: Dashboard buttons link to specific My Lists tabs
+- ✅ **Toast Notifications**: Success/error feedback on form submissions
 - 📅 **Completed**: September 7, 2025
 
 ## Tech Stack
@@ -27,6 +30,7 @@ ShowSwap is a social app where friends recommend TV shows via swipeable cards. U
 - `POST /api/auth/logout` - Logout 
 - `GET /api/me` - Current user info
 - `GET /api/friends` - Friends list
+- `GET /api/dashboard` - Dashboard data (currently watching, recently watched, compatible friends)
 - `POST /api/shows` - Add new show with status and optional rating
 - `GET /api/my/lists` - Get organized lists (watching/later/watched)
 - `POST /api/action/watching-now` - Mark show as currently watching
