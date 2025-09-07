@@ -111,11 +111,11 @@
                     <div id="rating-section" class="hidden">
                         <label class="block text-sm font-medium text-gray-700 mb-2">Rating</label>
                         <div class="flex space-x-1">
-                            <button type="button" class="heart-btn text-2xl text-gray-400 hover:text-red-500" data-rating="1">❤️</button>
-                            <button type="button" class="heart-btn text-2xl text-gray-400 hover:text-red-500" data-rating="2">❤️</button>
-                            <button type="button" class="heart-btn text-2xl text-gray-400 hover:text-red-500" data-rating="3">❤️</button>
-                            <button type="button" class="heart-btn text-2xl text-gray-400 hover:text-red-500" data-rating="4">❤️</button>
-                            <button type="button" class="heart-btn text-2xl text-gray-400 hover:text-red-500" data-rating="5">❤️</button>
+                            <button type="button" class="heart-btn text-2xl" data-rating="1">🖤</button>
+                            <button type="button" class="heart-btn text-2xl" data-rating="2">🖤</button>
+                            <button type="button" class="heart-btn text-2xl" data-rating="3">🖤</button>
+                            <button type="button" class="heart-btn text-2xl" data-rating="4">🖤</button>
+                            <button type="button" class="heart-btn text-2xl" data-rating="5">🖤</button>
                         </div>
                         <input type="hidden" id="show-rating" value="">
                     </div>
@@ -324,15 +324,11 @@
         function updateHearts(rating) {
             document.querySelectorAll('.heart-btn').forEach((btn, index) => {
                 console.log(`Updating heart ${index + 1}, should be ${index < rating ? 'red' : 'grey'}`);
-                // Remove both classes first
-                btn.classList.remove('text-gray-400', 'text-red-500');
                 
                 if (index < rating) {
-                    btn.classList.add('text-red-500');
-                    btn.style.color = '#ef4444'; // Fallback red color
+                    btn.textContent = '❤️'; // Red heart emoji
                 } else {
-                    btn.classList.add('text-gray-400');
-                    btn.style.color = '#9ca3af'; // Fallback grey color
+                    btn.textContent = '🖤'; // Grey heart emoji
                 }
             });
         }
