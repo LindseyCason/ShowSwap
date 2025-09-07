@@ -1,9 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
+const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 5000;
 
 // In-memory storage for MVP
 const users = new Map();
@@ -26,6 +27,14 @@ app.use(session({
     maxAge: 1000 * 60 * 60 * 24 * 7 // 1 week
   }
 }));
+
+// Serve static frontend
+app.use(express.static(path.join(__dirname, '../../web')));
+
+// Main route - serve the simple frontend
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../web/simple-index.html'));
+});
 
 // Basic health check
 app.get('/api/health', (req, res) => {
@@ -303,7 +312,8 @@ app.post('/api/action/watched', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 ShowSwap API server running on port ${PORT}`);
+  console.log(`🚀 ShowSwap full-stack app running on port ${PORT}`);
+  console.log(`🌐 Frontend: http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
   console.log(`📺 Add shows: POST http://localhost:${PORT}/api/shows`);
   console.log(`📋 My lists: GET http://localhost:${PORT}/api/my/lists`);
