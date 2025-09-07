@@ -111,11 +111,11 @@
                     <div id="rating-section" class="hidden">
                         <label class="block text-sm font-medium text-gray-700 mb-2">Rating</label>
                         <div class="flex space-x-1">
-                            <button type="button" class="star-btn text-2xl text-gray-400 hover:text-yellow-500" data-rating="1">⭐</button>
-                            <button type="button" class="star-btn text-2xl text-gray-400 hover:text-yellow-500" data-rating="2">⭐</button>
-                            <button type="button" class="star-btn text-2xl text-gray-400 hover:text-yellow-500" data-rating="3">⭐</button>
-                            <button type="button" class="star-btn text-2xl text-gray-400 hover:text-yellow-500" data-rating="4">⭐</button>
-                            <button type="button" class="star-btn text-2xl text-gray-400 hover:text-yellow-500" data-rating="5">⭐</button>
+                            <button type="button" class="heart-btn text-2xl text-gray-400 hover:text-red-500" data-rating="1">❤️</button>
+                            <button type="button" class="heart-btn text-2xl text-gray-400 hover:text-red-500" data-rating="2">❤️</button>
+                            <button type="button" class="heart-btn text-2xl text-gray-400 hover:text-red-500" data-rating="3">❤️</button>
+                            <button type="button" class="heart-btn text-2xl text-gray-400 hover:text-red-500" data-rating="4">❤️</button>
+                            <button type="button" class="heart-btn text-2xl text-gray-400 hover:text-red-500" data-rating="5">❤️</button>
                         </div>
                         <input type="hidden" id="show-rating" value="">
                     </div>
@@ -306,30 +306,30 @@
                 } else {
                     ratingSection.classList.add('hidden');
                     selectedRating = 0;
-                    updateStars(0);
+                    updateHearts(0);
                 }
             });
         });
 
         document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('star-btn')) {
+            if (e.target.classList.contains('heart-btn')) {
                 e.preventDefault();
                 selectedRating = parseInt(e.target.dataset.rating);
                 document.getElementById('show-rating').value = selectedRating;
-                updateStars(selectedRating);
-                console.log('Star clicked:', selectedRating);
+                updateHearts(selectedRating);
+                console.log('Heart clicked:', selectedRating);
             }
         });
 
-        function updateStars(rating) {
-            document.querySelectorAll('.star-btn').forEach((btn, index) => {
-                console.log(`Updating star ${index + 1}, should be ${index < rating ? 'gold' : 'grey'}`);
+        function updateHearts(rating) {
+            document.querySelectorAll('.heart-btn').forEach((btn, index) => {
+                console.log(`Updating heart ${index + 1}, should be ${index < rating ? 'red' : 'grey'}`);
                 // Remove both classes first
-                btn.classList.remove('text-gray-400', 'text-yellow-500');
+                btn.classList.remove('text-gray-400', 'text-red-500');
                 
                 if (index < rating) {
-                    btn.classList.add('text-yellow-500');
-                    btn.style.color = '#eab308'; // Fallback gold color
+                    btn.classList.add('text-red-500');
+                    btn.style.color = '#ef4444'; // Fallback red color
                 } else {
                     btn.classList.add('text-gray-400');
                     btn.style.color = '#9ca3af'; // Fallback grey color
