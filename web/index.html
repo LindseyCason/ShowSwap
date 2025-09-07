@@ -333,6 +333,18 @@
             });
         }
 
+        // Toast function
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 ${type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
         document.getElementById('add-show-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -342,18 +354,23 @@
             const rating = status === 'Watched' ? selectedRating : null;
             
             if (status === 'Watched' && !rating) {
-                alert('Please select a rating for watched shows');
+                showToast('Please select a rating for watched shows', 'error');
                 return;
             }
             
             const result = await addShow(title, platform, status, rating);
             
             if (result.show) {
-                alert('Show added successfully!');
+                showToast('Show added successfully!');
+                
+                // Clear form completely
                 document.getElementById('add-show-form').reset();
                 selectedRating = 0;
-                updateStars(0);
+                updateHearts(0); // Reset hearts to black
                 document.getElementById('rating-section').classList.add('hidden');
+                
+                // Reset radio buttons to default (Currently Watching)
+                document.querySelector('input[value="Currently Watching"]').checked = true;
             }
         });
 
