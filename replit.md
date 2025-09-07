@@ -3,25 +3,35 @@
 ## Project Overview
 ShowSwap is a social app where friends recommend TV shows via swipeable cards. Users can add shows, browse friends' decks, mark Watching Now/Watched/Watch Later, rate shows, and see compatibility scores with friends.
 
-## Current Status
-- ✅ Backend API server running on port 3001
-- ✅ Basic authentication system with username-only login  
-- ✅ In-memory storage (will migrate to Prisma + SQLite later)
-- 🔄 Frontend React app in development
-- 📅 Started: September 7, 2025
+## Current Status ✅ FULLY FUNCTIONAL MVP
+- ✅ **Full-stack app running on port 5000** with webview interface
+- ✅ **Frontend**: Complete HTML/JavaScript UI with Tailwind CSS styling
+- ✅ **Backend**: Comprehensive API with all core functionality
+- ✅ **Authentication**: Username-only login with session management
+- ✅ **Show management**: Add, rate, and organize shows
+- ✅ **Lists**: Currently Watching, Watch Later, Watched with ratings
+- ✅ **Testing**: Built-in API test functionality
+- 📅 **Completed**: September 7, 2025
 
 ## Tech Stack
-- **Backend**: Node.js + Express (JavaScript for now, will migrate to TypeScript)
-- **Frontend**: React + Vite + TypeScript + TailwindCSS  
-- **Database**: In-memory storage (migrating to SQLite via Prisma)
+- **Backend**: Node.js + Express (JavaScript)
+- **Frontend**: HTML + JavaScript + Tailwind CSS (via CDN)
+- **Database**: In-memory storage with Maps (perfect for MVP demo)
 - **Auth**: Simple username-only login with express-session
+- **Deployment**: Single server serving both API and frontend
 
-## Working API Endpoints
+## Complete API Endpoints
+- `GET /` - Frontend application
 - `GET /api/health` - Health check
 - `POST /api/auth/login` - Username-only login
 - `POST /api/auth/logout` - Logout 
 - `GET /api/me` - Current user info
-- `GET /api/friends` - Friends list (empty for now)
+- `GET /api/friends` - Friends list
+- `POST /api/shows` - Add new show with status and optional rating
+- `GET /api/my/lists` - Get organized lists (watching/later/watched)
+- `POST /api/action/watching-now` - Mark show as currently watching
+- `POST /api/action/watch-later` - Add show to watch later list  
+- `POST /api/action/watched` - Mark show as watched (requires rating)
 
 ## Project Structure
 ```
