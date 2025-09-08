@@ -4,7 +4,18 @@ import { useNavigate } from 'react-router-dom'
 export default function Login() {
   const [username, setUsername] = useState('')
   const [loading, setLoading] = useState(false)
+  const [apiTest, setApiTest] = useState('')
   const navigate = useNavigate()
+
+  const testAPI = async () => {
+    try {
+      const response = await fetch('/api/health')
+      const data = await response.json()
+      setApiTest(`✅ API Working: ${data.message}`)
+    } catch (error) {
+      setApiTest(`❌ API Error: ${error}`)
+    }
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -64,6 +75,21 @@ export default function Login() {
             {loading ? 'Logging in...' : 'Sign In'}
           </button>
         </form>
+        
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={testAPI}
+            className="group relative w-full flex justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            Test API Connection
+          </button>
+          {apiTest && (
+            <div className="text-center text-sm mt-2">
+              {apiTest}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

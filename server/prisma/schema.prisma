@@ -62,7 +62,7 @@ model UserShow {
   showId      String
   addedAt     DateTime @default(now())
   // the status chosen when added by this user (Watched/ToWatch)
-  initialStatus Status
+  initialStatus String // "ToWatch" | "Watched" | "WatchingNow" | "WatchLater"
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   show        Show     @relation(fields: [showId], references: [id], onDelete: Cascade)
   @@unique([userId, showId])
@@ -88,11 +88,4 @@ model Compatibility {
   userA     User     @relation("UserA_Compat", fields: [userAId], references: [id], onDelete: Cascade)
   userB     User     @relation("UserB_Compat", fields: [userBId], references: [id], onDelete: Cascade)
   @@unique([userAId, userBId])
-}
-
-enum Status {
-  ToWatch
-  Watched
-  WatchingNow
-  WatchLater
 }
