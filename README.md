@@ -29,3 +29,5 @@ npm run dev
 ## 📊 Database
 
 Pre-seeded with sample users, shows, and ratings. Uses SQLite with Prisma ORM.
+
+[Lindsey Cason](https://www.lindseycason.com)
