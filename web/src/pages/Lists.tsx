@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { getUserLists } from '../lib/api';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { getUserLists, updateShowStatus } from '../lib/api';
 import type { ShowWithRating } from '../lib/api';
+import RatingModal from '../components/RatingModal';
 
 type TabType = 'watching' | 'watched' | 'toWatch';
 
@@ -55,7 +56,49 @@ const EmptyState = ({ tab, onAddShow }: { tab: TabType; onAddShow: () => void })
   );
 };
 
-const ShowCard = ({ show }: { show: ShowWithRating }) => {
+const ShowCard = ({ show, currentTab, onStatusChange }: { 
+  show: ShowWithRating; 
+  currentTab: TabType;
+  onStatusChange: (showId: string, newStatus: string, rating?: number) => void;
+}) => {
+  const getStatusButtons = () => {
+    switch (currentTab) {
+      case 'toWatch':
+        return (
+          <button
+            onClick={() => onStatusChange(show.id, 'WatchingNow')}
+            className="px-3 py-1 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+          >
+            Start Watching
+          </button>
+        );
+      
+      case 'watching':
+        return (
+          <div className="flex flex-col space-y-1">
+            <button
+              onClick={() => onStatusChange(show.id, 'Watched')}
+              className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Finished Watching
+            </button>
+            <button
+              onClick={() => onStatusChange(show.id, 'ToWatch')}
+              className="px-3 py-1 text-xs font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+            >
+              Watch Later
+            </button>
+          </div>
+        );
+      
+      case 'watched':
+        return null; // No status change buttons for watched shows
+      
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
       <div className="flex items-start space-x-4">
@@ -91,26 +134,25 @@ const ShowCard = ({ show }: { show: ShowWithRating }) => {
           )}
           
           {/* Added Date */}
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 mb-3">
             Added {new Date(show.addedAt).toLocaleDateString()}
           </p>
-        </div>
-        
-        {/* Actions Menu */}
-        <div className="flex-shrink-0">
-          <button className="p-2 text-gray-400 hover:text-gray-600 focus:outline-none">
-            <span className="text-lg">⋮</span>
-          </button>
+
+          {/* Status Action Buttons */}
+          <div className="flex items-center">
+            {getStatusButtons()}
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-const ShowGrid = ({ shows, tab, onAddShow }: { 
+const ShowGrid = ({ shows, tab, onAddShow, onStatusChange }: { 
   shows: ShowWithRating[]; 
   tab: TabType; 
   onAddShow: () => void;
+  onStatusChange: (showId: string, newStatus: string, rating?: number) => void;
 }) => {
   if (shows.length === 0) {
     return <EmptyState tab={tab} onAddShow={onAddShow} />;
@@ -119,7 +161,12 @@ const ShowGrid = ({ shows, tab, onAddShow }: {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {shows.map((show) => (
-        <ShowCard key={show.id} show={show} />
+        <ShowCard 
+          key={show.id} 
+          show={show} 
+          currentTab={tab}
+          onStatusChange={onStatusChange}
+        />
       ))}
     </div>
   );
@@ -127,7 +174,18 @@ const ShowGrid = ({ shows, tab, onAddShow }: {
 
 export default function Lists() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>('watching');
+  const [ratingModal, setRatingModal] = useState<{
+    isOpen: boolean;
+    showId: string;
+    showTitle: string;
+  }>({
+    isOpen: false,
+    showId: '',
+    showTitle: ''
+  });
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const { 
     data: userLists, 
@@ -145,6 +203,54 @@ export default function Lists() {
 
   const handleBackToDashboard = () => {
     navigate('/');
+  };
+
+  const handleStatusChange = async (showId: string, newStatus: string, rating?: number) => {
+    // If changing to "Watched", show rating modal
+    if (newStatus === 'Watched' && !rating) {
+      const show = userLists ? 
+        [...userLists.watching, ...userLists.toWatch, ...userLists.watched]
+          .find(s => s.id === showId) : null;
+      
+      if (show) {
+        setRatingModal({
+          isOpen: true,
+          showId,
+          showTitle: show.title
+        });
+      }
+      return;
+    }
+
+    // Update status directly for other cases
+    try {
+      setIsUpdating(true);
+      await updateShowStatus(showId, newStatus, rating);
+      // Refetch the lists to update the UI
+      queryClient.invalidateQueries({ queryKey: ['userLists'] });
+    } catch (error) {
+      console.error('Failed to update show status:', error);
+      // You could add a toast notification here
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleRatingSubmit = async (rating: number) => {
+    try {
+      setIsUpdating(true);
+      await updateShowStatus(ratingModal.showId, 'Watched', rating);
+      queryClient.invalidateQueries({ queryKey: ['userLists'] });
+      setRatingModal({ isOpen: false, showId: '', showTitle: '' });
+    } catch (error) {
+      console.error('Failed to update show status with rating:', error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleRatingModalClose = () => {
+    setRatingModal({ isOpen: false, showId: '', showTitle: '' });
   };
 
   if (loading) {
@@ -275,10 +381,29 @@ export default function Lists() {
               shows={getShowsForTab(activeTab)} 
               tab={activeTab} 
               onAddShow={handleAddShow}
+              onStatusChange={handleStatusChange}
             />
           </div>
         </div>
       </div>
+
+      {/* Rating Modal */}
+      <RatingModal
+        isOpen={ratingModal.isOpen}
+        onClose={handleRatingModalClose}
+        onSubmit={handleRatingSubmit}
+        showTitle={ratingModal.showTitle}
+      />
+
+      {/* Loading Overlay */}
+      {isUpdating && (
+        <div className="fixed inset-0 bg-black bg-opacity-25 flex items-center justify-center z-40">
+          <div className="bg-white rounded-lg p-6">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+            <p className="mt-2 text-sm text-gray-600">Updating show status...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

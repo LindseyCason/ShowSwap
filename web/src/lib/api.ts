@@ -146,6 +146,24 @@ export const addShow = async (show: {
   return response.json();
 };
 
+// Update show status
+export const updateShowStatus = async (showId: string, status: string, rating?: number): Promise<{ success: boolean; show: Show; status: string; rating?: number | null }> => {
+  const response = await fetch(`${API_BASE_URL}/api/shows/${showId}/status`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ status, rating }),
+    credentials: 'include',
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to update show status');
+  }
+  
+  return response.json();
+};
+
 export interface UserProfileData {
   user: User;
   shows: ShowWithRating[];

@@ -420,6 +420,138 @@ app.get('/api/my/lists', async (req, res) => {
   }
 });
 
+// Update show status
+app.patch('/api/shows/:showId/status', async (req, res) => {
+  try {
+    const userId = (req.session as any)?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { showId } = req.params;
+    const { status, rating } = req.body;
+
+    if (!status) {
+      return res.status(400).json({ error: 'Status is required' });
+    }
+
+    // Validate status
+    const validStatuses = ['WatchingNow', 'Watched', 'ToWatch'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    // Update user show status
+    const userShow = await prisma.userShow.update({
+      where: { 
+        userId_showId: { userId, showId }
+      },
+      data: { 
+        initialStatus: status 
+      },
+      include: { show: true }
+    });
+
+    // Handle rating for watched shows
+    if (status === 'Watched' && rating && rating >= 1 && rating <= 5) {
+      await prisma.rating.upsert({
+        where: { 
+          userId_showId: { userId, showId }
+        },
+        create: { 
+          userId, 
+          showId, 
+          stars: rating 
+        },
+        update: { 
+          stars: rating 
+        }
+      });
+    } else if (status !== 'Watched') {
+      // Remove rating if status is not Watched
+      await prisma.rating.deleteMany({
+        where: { userId, showId }
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      show: userShow.show,
+      status: userShow.initialStatus,
+      rating: status === 'Watched' ? rating || null : null
+    });
+  } catch (error) {
+    console.error('Update show status error:', error);
+    res.status(500).json({ error: 'Failed to update show status' });
+  }
+});
+
+// Update show status
+app.patch('/api/shows/:showId/status', async (req, res) => {
+  try {
+    const userId = (req.session as any)?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { showId } = req.params;
+    const { status, rating } = req.body;
+
+    if (!status) {
+      return res.status(400).json({ error: 'Status is required' });
+    }
+
+    // Validate status
+    const validStatuses = ['WatchingNow', 'Watched', 'ToWatch'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    // Update user show status
+    const userShow = await prisma.userShow.update({
+      where: { 
+        userId_showId: { userId, showId }
+      },
+      data: { 
+        initialStatus: status 
+      },
+      include: { show: true }
+    });
+
+    // Handle rating for watched shows
+    if (status === 'Watched' && rating && rating >= 1 && rating <= 5) {
+      await prisma.rating.upsert({
+        where: { 
+          userId_showId: { userId, showId }
+        },
+        create: { 
+          userId, 
+          showId, 
+          stars: rating 
+        },
+        update: { 
+          stars: rating 
+        }
+      });
+    } else if (status !== 'Watched') {
+      // Remove rating if status is not Watched
+      await prisma.rating.deleteMany({
+        where: { userId, showId }
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      show: userShow.show,
+      status: userShow.initialStatus,
+      rating: status === 'Watched' ? rating || null : null
+    });
+  } catch (error) {
+    console.error('Update show status error:', error);
+    res.status(500).json({ error: 'Failed to update show status' });
+  }
+});
+
 // Action endpoints
 app.post('/api/action/watching-now', async (req, res) => {
   try {
