@@ -222,7 +222,10 @@ export default function Dashboard() {
         <div className="mt-8 bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <button className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-left">
+            <button 
+              onClick={() => navigate('/add')}
+              className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-left"
+            >
               <div className="text-2xl mb-2">📺</div>
               <div className="text-sm font-medium text-gray-900">Add Show</div>
               <div className="text-xs text-gray-500">Add a new show to your list</div>
