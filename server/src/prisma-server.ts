@@ -9,7 +9,8 @@ const PORT = process.env.PORT || 3000;
 const prisma = new PrismaClient();
 
 // Type definitions
-type Status = "ToWatch" | "Watched" | "WatchingNow" | "WatchLater";
+// Define valid show statuses
+type Status = "ToWatch" | "Watched" | "WatchingNow";
 
 // Middleware
 app.use(cors({
@@ -35,7 +36,14 @@ app.use(session({
 //   res.sendFile(path.join(__dirname, '../../web/index.html'));
 // });
 
-// Basic health check
+// Debug endpoint to check current user
+app.get('/api/debug/user', (req, res) => {
+  const userId = (req.session as any)?.userId;
+  console.log('Debug: Current session userId:', userId);
+  res.json({ userId, session: req.session });
+});
+
+// Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'ShowSwap API with Prisma is running!' });
 });
@@ -549,6 +557,74 @@ app.patch('/api/shows/:showId/status', async (req, res) => {
   } catch (error) {
     console.error('Update show status error:', error);
     res.status(500).json({ error: 'Failed to update show status' });
+  }
+});
+
+// Add show from friend to my To Watch list
+app.post('/api/shows/:showId/add-to-watch', async (req, res) => {
+  console.log('🎯 Add to watch endpoint called for showId:', req.params.showId);
+  
+  try {
+    const userId = (req.session as any)?.userId;
+    console.log('Current user ID:', userId);
+    
+    if (!userId) {
+      console.log('❌ User not authenticated');
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { showId } = req.params;
+
+    // Check if show exists
+    const show = await prisma.show.findUnique({
+      where: { id: showId }
+    });
+
+    console.log('Found show:', show);
+
+    if (!show) {
+      console.log('❌ Show not found in database');
+      return res.status(404).json({ error: 'Show not found' });
+    }
+
+    // Check if user already has this show
+    const existingUserShow = await prisma.userShow.findUnique({
+      where: { 
+        userId_showId: { userId, showId }
+      }
+    });
+
+    console.log('Existing user show:', existingUserShow);
+
+    if (existingUserShow) {
+      console.log('❌ Show already in user list');
+      return res.status(400).json({ 
+        error: 'Show already in your list',
+        status: existingUserShow.initialStatus 
+      });
+    }
+
+    // Add show to user's "To Watch" list
+    const userShow = await prisma.userShow.create({
+      data: { 
+        userId, 
+        showId, 
+        initialStatus: 'ToWatch'
+      },
+      include: { show: true }
+    });
+
+    console.log('✅ Successfully created user show:', userShow);
+
+    res.json({ 
+      success: true, 
+      show: userShow.show,
+      status: userShow.initialStatus,
+      message: 'Show added to your To Watch list!'
+    });
+  } catch (error) {
+    console.error('❌ Add show to watch error:', error);
+    res.status(500).json({ error: 'Failed to add show to watch list' });
   }
 });
 

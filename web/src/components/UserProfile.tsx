@@ -1,4 +1,7 @@
+import { useState, useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { User, ShowWithRating, Friend } from '../lib/api'
+import { addShowToWatch, getCurrentUserShows } from '../lib/api'
 
 interface UserProfileProps {
   user: User | null
@@ -22,6 +25,98 @@ export default function UserProfile({
   mostCompatibleFriend,
   onViewProfile 
 }: UserProfileProps) {
+  const queryClient = useQueryClient()
+  const [currentUserShows, setCurrentUserShows] = useState<(ShowWithRating & { status: string })[]>([])
+  const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({})
+  const [successMessages, setSuccessMessages] = useState<Record<string, string>>({})
+
+  // Debug logging
+  console.log('UserProfile Debug Info:');
+  console.log('- User:', user);
+  console.log('- User shows:', userShows);
+  console.log('- Number of user shows:', userShows?.length);
+  console.log('- My shows:', currentUserShows);
+  console.log('- Number of my shows:', currentUserShows?.length);
+
+  // Load current user's shows to check which ones are already added
+  useEffect(() => {
+    const loadCurrentUserShows = async () => {
+      try {
+        const shows = await getCurrentUserShows()
+        setCurrentUserShows(shows)
+      } catch (error) {
+        console.error('Failed to load current user shows:', error)
+      }
+    }
+
+    if (isOpen) {
+      loadCurrentUserShows()
+    }
+  }, [isOpen])
+
+  const getShowInMyList = (showId: string) => {
+    return currentUserShows.find(show => show.id === showId)
+  }
+
+  const getStatusDisplayName = (status: string) => {
+    switch (status) {
+      case 'WatchingNow':
+        return 'Watching Now'
+      case 'ToWatch':
+        return 'To Watch'
+      case 'Watched':
+        return 'Watched'
+      default:
+        return status
+    }
+  }
+
+  const handleAddToWatch = async (showId: string, showTitle: string) => {
+    console.log('Adding show to watch:', showId, showTitle)
+    setLoadingStates(prev => ({ ...prev, [showId]: true }))
+    
+    try {
+      console.log('Calling addShowToWatch API...')
+      const result = await addShowToWatch(showId)
+      console.log('API result:', result)
+      
+      // Update local state
+      setCurrentUserShows(prev => [...prev, { ...result.show as ShowWithRating, status: result.status }])
+      setSuccessMessages(prev => ({ ...prev, [showId]: result.message }))
+      
+      // Invalidate queries to refresh lists
+      queryClient.invalidateQueries({ queryKey: ['userLists'] })
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccessMessages(prev => {
+          const newMessages = { ...prev }
+          delete newMessages[showId]
+          return newMessages
+        })
+      }, 3000)
+      
+    } catch (error) {
+      console.error('Failed to add show:', error)
+      // Add visible error feedback
+      setSuccessMessages(prev => ({ 
+        ...prev, 
+        [showId]: `Error: ${error instanceof Error ? error.message : 'Failed to add show'}` 
+      }))
+      
+      // Clear error message after 5 seconds
+      setTimeout(() => {
+        setSuccessMessages(prev => {
+          const newMessages = { ...prev }
+          delete newMessages[showId]
+          return newMessages
+        })
+      }, 5000)
+    } finally {
+      setLoadingStates(prev => ({ ...prev, [showId]: false }))
+    }
+  }
+  
   if (!isOpen || !user) return null
 
   return (
@@ -118,7 +213,7 @@ export default function UserProfile({
               <div className="space-y-3">
                 {userShows.map((show) => (
                   <div key={show.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
+                    <div className="flex-1">
                       <h4 className="font-medium text-gray-900">{show.title}</h4>
                       <p className="text-sm text-gray-600">{show.platform}</p>
                       {show.rating && (
@@ -126,11 +221,39 @@ export default function UserProfile({
                           {'★'.repeat(show.rating)} ({show.rating}/5)
                         </p>
                       )}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-500 mt-1">
                         Added {new Date(show.addedAt).toLocaleDateString()}
                       </p>
+                    </div>
+                    <div className="ml-4 flex flex-col items-end space-y-2">
+                      {(() => {
+                        const myShow = getShowInMyList(show.id);
+                        return myShow ? (
+                          <div className="text-right">
+                            <span className="text-xs text-green-600 font-medium">
+                              ✓ {getStatusDisplayName(myShow.status)}
+                            </span>
+                            {myShow.rating && (
+                              <div className="text-xs text-yellow-600 mt-1">
+                                Your rating: {'★'.repeat(myShow.rating)}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleAddToWatch(show.id, show.title)}
+                            disabled={loadingStates[show.id]}
+                            className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            {loadingStates[show.id] ? 'Adding...' : 'Add to my shows'}
+                          </button>
+                        );
+                      })()}
+                      {successMessages[show.id] && (
+                        <span className={`text-xs ${successMessages[show.id].startsWith('Error') ? 'text-red-600' : 'text-green-600'}`}>
+                          {successMessages[show.id]}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}

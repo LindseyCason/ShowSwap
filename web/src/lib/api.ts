@@ -164,6 +164,36 @@ export const updateShowStatus = async (showId: string, status: string, rating?: 
   return response.json();
 };
 
+// Add show from friend to my To Watch list
+export const addShowToWatch = async (showId: string): Promise<{ success: boolean; show: Show; status: string; message: string }> => {
+  const response = await fetch(`${API_BASE_URL}/api/shows/${showId}/add-to-watch`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Failed to add show to watch list');
+  }
+  
+  return response.json();
+};
+
+// Get current user's shows (for checking if already added)
+export const getCurrentUserShows = async (): Promise<(ShowWithRating & { status: string })[]> => {
+  try {
+    const lists = await getUserLists();
+    return [
+      ...lists.watching.map(show => ({ ...show, status: 'WatchingNow' })),
+      ...lists.toWatch.map(show => ({ ...show, status: 'ToWatch' })),
+      ...lists.watched.map(show => ({ ...show, status: 'Watched' }))
+    ];
+  } catch (error) {
+    console.error('Failed to get current user shows:', error);
+    return []; // Return empty array on error
+  }
+};
+
 export interface UserProfileData {
   user: User;
   shows: ShowWithRating[];

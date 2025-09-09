@@ -61,8 +61,8 @@ model UserShow {
   userId      String
   showId      String
   addedAt     DateTime @default(now())
-  // the status chosen when added by this user (Watched/ToWatch)
-  initialStatus String // "ToWatch" | "Watched" | "WatchingNow" | "WatchLater"
+  // the status chosen when added by this user
+  initialStatus String // "ToWatch" | "Watched" | "WatchingNow"
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   show        Show     @relation(fields: [showId], references: [id], onDelete: Cascade)
   @@unique([userId, showId])
