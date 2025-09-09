@@ -238,7 +238,10 @@ export default function Dashboard() {
               <div className="text-sm font-medium text-gray-900">My Lists</div>
               <div className="text-xs text-gray-500">View all your show lists</div>
             </button>
-            <button className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-left">
+            <button 
+              onClick={() => navigate('/friends')}
+              className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-left"
+            >
               <div className="text-2xl mb-2">👥</div>
               <div className="text-sm font-medium text-gray-900">Friends</div>
               <div className="text-xs text-gray-500">Manage your friends</div>
