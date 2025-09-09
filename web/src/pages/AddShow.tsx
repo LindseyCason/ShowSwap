@@ -15,8 +15,9 @@ const PLATFORMS = [
 ];
 
 const STATUSES = [
-  { value: 'watched', label: 'Watched' },
-  { value: 'to-watch', label: 'To Watch' }
+  { value: 'WatchingNow', label: 'Watching Now' },
+  { value: 'Watched', label: 'Watched' },
+  { value: 'ToWatch', label: 'To Watch' }
 ];
 
 export default function AddShow() {
@@ -25,7 +26,7 @@ export default function AddShow() {
     title: '',
     platform: '',
     customPlatform: '',
-    status: 'to-watch',
+    status: 'WatchingNow',
     rating: 0
   });
   const [loading, setLoading] = useState(false);
@@ -47,7 +48,7 @@ export default function AddShow() {
       if (formData.platform === 'Other' && !formData.customPlatform.trim()) {
         throw new Error('Custom platform name is required');
       }
-      if (formData.status === 'watched' && formData.rating === 0) {
+      if (formData.status === 'Watched' && formData.rating === 0) {
         throw new Error('Rating is required for watched shows');
       }
 
@@ -58,7 +59,7 @@ export default function AddShow() {
         title: formData.title.trim(),
         platform: finalPlatform,
         status: formData.status,
-        ...(formData.status === 'watched' && formData.rating > 0 ? { rating: formData.rating } : {})
+        ...(formData.status === 'Watched' && formData.rating > 0 ? { rating: formData.rating } : {})
       };
 
       await addShow(showData);
@@ -164,8 +165,8 @@ export default function AddShow() {
                       onChange={(e) => setFormData(prev => ({ 
                         ...prev, 
                         status: e.target.value,
-                        // Reset rating when switching to "to-watch"
-                        rating: e.target.value === 'to-watch' ? 0 : prev.rating
+                        // Reset rating when switching away from "Watched"
+                        rating: e.target.value === 'Watched' ? prev.rating : 0
                       }))}
                       className="mr-3 text-indigo-600 focus:ring-indigo-500"
                     />
@@ -175,8 +176,8 @@ export default function AddShow() {
               </div>
             </div>
 
-            {/* Rating (only shown if status is "watched") */}
-            {formData.status === 'watched' && (
+            {/* Rating (only shown if status is "Watched") */}
+            {formData.status === 'Watched' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   Rating *

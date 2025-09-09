@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import AddShow from './pages/AddShow'
+import Lists from './pages/Lists'
 
 const queryClient = new QueryClient()
 
@@ -15,6 +16,7 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/add" element={<AddShow />} />
+            <Route path="/lists" element={<Lists />} />
             <Route path="/" element={<Dashboard />} />
           </Routes>
         </div>

@@ -230,7 +230,10 @@ export default function Dashboard() {
               <div className="text-sm font-medium text-gray-900">Add Show</div>
               <div className="text-xs text-gray-500">Add a new show to your list</div>
             </button>
-            <button className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-left">
+            <button 
+              onClick={() => navigate('/lists')}
+              className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-left"
+            >
               <div className="text-2xl mb-2">📋</div>
               <div className="text-sm font-medium text-gray-900">My Lists</div>
               <div className="text-xs text-gray-500">View all your show lists</div>

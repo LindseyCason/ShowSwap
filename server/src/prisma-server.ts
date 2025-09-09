@@ -402,10 +402,6 @@ app.get('/api/my/lists', async (req, res) => {
         ...us.show,
         addedAt: us.addedAt
       })),
-      watchLater: userShows.filter(us => us.initialStatus === 'WatchLater').map(us => ({
-        ...us.show,
-        addedAt: us.addedAt
-      })),
       toWatch: userShows.filter(us => us.initialStatus === 'ToWatch').map(us => ({
         ...us.show,
         addedAt: us.addedAt

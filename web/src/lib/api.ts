@@ -39,7 +39,6 @@ export interface DashboardData {
 
 export interface UserLists {
   watching: ShowWithRating[];
-  watchLater: ShowWithRating[];
   toWatch: ShowWithRating[];
   watched: ShowWithRating[];
 }
