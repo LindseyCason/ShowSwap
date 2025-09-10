@@ -133,7 +133,7 @@ app.get('/api/me', async (req, res) => {
   }
 });
 
-// Friends endpoints
+// Friends endpoints - now returns followers and following
 app.get('/api/friends', async (req, res) => {
   try {
     const userId = (req.session as any)?.userId;
@@ -141,20 +141,30 @@ app.get('/api/friends', async (req, res) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const friendships = await prisma.friendship.findMany({
-      where: {
-        OR: [
-          { userAId: userId },
-          { userBId: userId }
-        ]
-      },
+    // Get user's last followers check time for "new" determination
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { lastFollowersCheck: true }
+    });
+
+    // Get users that the current user is following
+    const following = await prisma.follow.findMany({
+      where: { followerId: userId },
       include: {
-        userA: { select: { id: true, username: true } },
-        userB: { select: { id: true, username: true } }
+        following: { select: { id: true, username: true } }
       }
     });
 
-    // Get compatibility scores for all friends
+    // Get users that are following the current user (with timestamps)
+    const followers = await prisma.follow.findMany({
+      where: { followingId: userId },
+      include: {
+        follower: { select: { id: true, username: true } }
+      },
+      orderBy: { createdAt: 'desc' } // Most recent followers first
+    });
+
+    // Get compatibility scores for all users I'm following
     const compatibilities = await prisma.compatibility.findMany({
       where: {
         OR: [
@@ -169,28 +179,61 @@ app.get('/api/friends', async (req, res) => {
       }
     });
 
-    // Create a map of friend ID to compatibility score
+    // Create a map of user ID to compatibility score
     const compatibilityMap = new Map<string, number>();
     compatibilities.forEach(comp => {
       const friendId = comp.userAId === userId ? comp.userBId : comp.userAId;
       compatibilityMap.set(friendId, comp.score);
     });
 
-    const friends = friendships.map(friendship => {
-      const friend = friendship.userAId === userId ? friendship.userB : friendship.userA;
-      const compatibility = compatibilityMap.get(friend.id) || 0; // Default to 0 if no compatibility score
+    // Check for mutual follows to determine if they're "friends"
+    const followingIds = new Set(following.map(f => f.following.id));
+    const followerIds = new Set(followers.map(f => f.follower.id));
+
+    const followingData = following.map(follow => {
+      const user = follow.following;
+      const isMutual = followerIds.has(user.id);
+      const compatibility = compatibilityMap.get(user.id) || 0;
       
       return {
-        id: friend.id,
-        username: friend.username,
-        compatibility
+        id: user.id,
+        username: user.username,
+        compatibility,
+        isMutual,
+        relationship: 'following'
       };
     });
 
-    res.json(friends);
+    // Return all followers data (including mutual connections and new status)
+    const followersData = followers.map(follow => {
+      const user = follow.follower;
+      const isMutual = followingIds.has(user.id);
+      const compatibility = compatibilityMap.get(user.id) || 0;
+      
+      // Determine if this follower is "new" based on lastFollowersCheck
+      const isNew = currentUser?.lastFollowersCheck 
+        ? follow.createdAt > currentUser.lastFollowersCheck
+        : true; // If never checked, all are "new"
+      
+      return {
+        id: user.id,
+        username: user.username,
+        compatibility,
+        isMutual,
+        relationship: 'follower',
+        isNew,
+        followedAt: follow.createdAt
+      };
+    });
+
+    res.json({
+      following: followingData,
+      followers: followersData, // Show all followers including mutual ones
+      mutualFriends: followingData.filter(f => f.isMutual)
+    });
   } catch (error) {
     console.error('Friends error:', error);
-    res.status(500).json({ error: 'Failed to get friends' });
+    res.status(500).json({ error: 'Failed to get friends data' });
   }
 });
 
@@ -305,6 +348,223 @@ app.delete('/api/friends/:friendId', async (req, res) => {
   }
 });
 
+// Follow user endpoint
+app.post('/api/follow/:userId', async (req, res) => {
+  try {
+    const currentUserId = (req.session as any)?.userId;
+    if (!currentUserId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { userId: targetUserId } = req.params;
+
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    if (currentUserId === targetUserId) {
+      return res.status(400).json({ error: 'Cannot follow yourself' });
+    }
+
+    // Check if already following
+    const existingFollow = await prisma.follow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId: currentUserId,
+          followingId: targetUserId
+        }
+      }
+    });
+
+    if (existingFollow) {
+      return res.status(400).json({ error: 'Already following this user' });
+    }
+
+    // Check if the target user exists
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, username: true, createdAt: true }
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Create the follow relationship
+    await prisma.follow.create({
+      data: {
+        followerId: currentUserId,
+        followingId: targetUserId
+      }
+    });
+
+    // Check if this creates a mutual follow (friendship)
+    const reverseFollow = await prisma.follow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId: targetUserId,
+          followingId: currentUserId
+        }
+      }
+    });
+
+    let isMutual = false;
+    if (reverseFollow) {
+      // Both users follow each other - calculate compatibility
+      isMutual = true;
+      const score = await calculateCompatibility(currentUserId, targetUserId);
+      
+      if (score !== null) {
+        const [userAId, userBId] = currentUserId < targetUserId ? [currentUserId, targetUserId] : [targetUserId, currentUserId];
+        
+        await prisma.compatibility.upsert({
+          where: { userAId_userBId: { userAId, userBId } },
+          create: { userAId, userBId, score },
+          update: { score },
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'User followed successfully',
+      user: targetUser,
+      isMutual
+    });
+
+  } catch (error) {
+    console.error('Follow user error:', error);
+    res.status(500).json({ error: 'Failed to follow user' });
+  }
+});
+
+// Unfollow user endpoint
+app.delete('/api/follow/:userId', async (req, res) => {
+  try {
+    const currentUserId = (req.session as any)?.userId;
+    if (!currentUserId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { userId: targetUserId } = req.params;
+
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    if (currentUserId === targetUserId) {
+      return res.status(400).json({ error: 'Cannot unfollow yourself' });
+    }
+
+    // Find and delete the follow relationship
+    const deletedFollow = await prisma.follow.deleteMany({
+      where: {
+        followerId: currentUserId,
+        followingId: targetUserId
+      }
+    });
+
+    if (deletedFollow.count === 0) {
+      return res.status(404).json({ error: 'You are not following this user' });
+    }
+
+    // If there was a mutual follow, remove the compatibility score
+    const [userAId, userBId] = currentUserId < targetUserId ? [currentUserId, targetUserId] : [targetUserId, currentUserId];
+    await prisma.compatibility.deleteMany({
+      where: { userAId, userBId }
+    });
+
+    res.json({
+      success: true,
+      message: 'User unfollowed successfully'
+    });
+
+  } catch (error) {
+    console.error('Unfollow user error:', error);
+    res.status(500).json({ error: 'Failed to unfollow user' });
+  }
+});
+
+// Get new followers count for notification
+app.get('/api/followers/new', async (req, res) => {
+  try {
+    const userId = (req.session as any)?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Get user's last followers check time
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { lastFollowersCheck: true }
+    });
+
+    // If user has never checked, consider all followers as new
+    // Otherwise, only count followers who followed after the last check
+    const newFollowersCount = await prisma.follow.count({
+      where: { 
+        followingId: userId,
+        createdAt: user?.lastFollowersCheck 
+          ? { gt: user.lastFollowersCheck }
+          : undefined
+      }
+    });
+
+    // Get the actual new followers for display
+    const newFollowers = await prisma.follow.findMany({
+      where: { 
+        followingId: userId,
+        createdAt: user?.lastFollowersCheck 
+          ? { gt: user.lastFollowersCheck }
+          : undefined
+      },
+      include: {
+        follower: {
+          select: {
+            id: true,
+            username: true,
+            avatarUrl: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({
+      count: newFollowersCount,
+      hasNewFollowers: newFollowersCount > 0,
+      newFollowers: newFollowers.map(follow => follow.follower),
+      lastChecked: user?.lastFollowersCheck
+    });
+
+  } catch (error) {
+    console.error('Get new followers error:', error);
+    res.status(500).json({ error: 'Failed to get new followers' });
+  }
+});
+
+// Mark followers as checked (update lastFollowersCheck timestamp)
+app.post('/api/followers/mark-checked', async (req, res) => {
+  try {
+    const userId = (req.session as any)?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Update the user's lastFollowersCheck timestamp
+    await prisma.user.update({
+      where: { id: userId },
+      data: { lastFollowersCheck: new Date() }
+    });
+
+    res.json({ success: true, checkedAt: new Date() });
+
+  } catch (error) {
+    console.error('Mark followers checked error:', error);
+    res.status(500).json({ error: 'Failed to mark followers as checked' });
+  }
+});
+
 // Dashboard endpoint
 app.get('/api/dashboard', async (req, res) => {
   try {
@@ -357,26 +617,44 @@ app.get('/api/dashboard', async (req, res) => {
       orderBy: { addedAt: 'desc' }
     });
 
-    // Get compatible friends
-    const compatibleFriends = await prisma.compatibility.findMany({
+    // Get compatible friends (people I follow, sorted by compatibility)
+    const following = await prisma.follow.findMany({
+      where: { followerId: userId },
+      include: {
+        following: { select: { id: true, username: true } }
+      }
+    });
+
+    // Get compatibility scores for people I follow
+    const compatibilities = await prisma.compatibility.findMany({
       where: {
         OR: [
           { userAId: userId },
           { userBId: userId }
         ]
       },
-      include: {
-        userA: { select: { id: true, username: true } },
-        userB: { select: { id: true, username: true } }
-      },
-      orderBy: { score: 'desc' },
-      take: 3
+      select: {
+        userAId: true,
+        userBId: true,
+        score: true
+      }
     });
 
-    const friends = compatibleFriends.map(comp => ({
-      friend: comp.userAId === userId ? comp.userB : comp.userA,
-      compatibility: comp.score
-    }));
+    // Create a map of user ID to compatibility score
+    const compatibilityMap = new Map<string, number>();
+    compatibilities.forEach(comp => {
+      const friendId = comp.userAId === userId ? comp.userBId : comp.userAId;
+      compatibilityMap.set(friendId, comp.score);
+    });
+
+    // Get top 3 compatible people I follow
+    const compatibleFriends = following
+      .map(follow => ({
+        friend: follow.following,
+        compatibility: compatibilityMap.get(follow.following.id) || 0
+      }))
+      .sort((a, b) => b.compatibility - a.compatibility)
+      .slice(0, 3);
 
     res.json({
       watchingNow: watchingNow.map(us => ({
@@ -392,7 +670,7 @@ app.get('/api/dashboard', async (req, res) => {
         addedAt: us.addedAt,
         rating: us.user.ratings.find(r => r.showId === us.showId)?.stars || null
       })),
-      compatibleFriends: friends
+      compatibleFriends: compatibleFriends
     });
   } catch (error) {
     console.error('Dashboard error:', error);
@@ -418,34 +696,42 @@ app.get('/api/users/search', async (req, res) => {
       return res.status(400).json({ error: 'Search query must be at least 2 characters' });
     }
 
-    // Get current user's friends to exclude them from results
-    const currentUserFriends = await prisma.friendship.findMany({
+    // Get users that the current user is already following to exclude them from results
+    const currentUserFollowing = await prisma.follow.findMany({
       where: {
-        OR: [
-          { userAId: currentUserId },
-          { userBId: currentUserId }
-        ]
+        followerId: currentUserId
       },
       select: {
-        userAId: true,
-        userBId: true
+        followingId: true
       }
     });
 
-    const friendIds = currentUserFriends.flatMap(f => 
-      f.userAId === currentUserId ? [f.userBId] : [f.userAId]
-    );
+    const followingIds = currentUserFollowing.map(f => f.followingId);
+    
+    // Always exclude current user, plus anyone they're following
+    const excludeIds = [currentUserId, ...followingIds];
 
     // Search for users by username (case-insensitive contains search)
-    // Exclude current user and existing friends
+    // Exclude current user and users already being followed
     const users = await prisma.user.findMany({
       where: {
-        username: {
-          contains: query
-        },
-        id: {
-          notIn: [currentUserId, ...friendIds]
-        }
+        AND: [
+          {
+            username: {
+              contains: query
+            }
+          },
+          {
+            id: {
+              notIn: excludeIds
+            }
+          },
+          {
+            id: {
+              not: currentUserId // Extra safety check to exclude current user
+            }
+          }
+        ]
       },
       select: {
         id: true,

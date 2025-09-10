@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import * as api from './api';
-import type { DashboardData, UserLists, User, Friend } from './api';
+import type { DashboardData, UserLists, User, Friend, FollowData, NewFollowersData } from './api';
 
 // Custom hook for dashboard data
 export const useDashboard = (enabled: boolean = true) => {
@@ -119,7 +119,7 @@ export const useCurrentUser = () => {
 
 // Custom hook for friends
 export const useFriends = () => {
-  const [friends, setFriends] = useState<Friend[]>([]);
+  const [followData, setFollowData] = useState<FollowData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -129,7 +129,7 @@ export const useFriends = () => {
         setLoading(true);
         setError(null);
         const friendsData = await api.getFriends();
-        setFriends(friendsData);
+        setFollowData(friendsData);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load friends');
         console.error('Friends error:', err);
@@ -141,5 +141,111 @@ export const useFriends = () => {
     fetchFriends();
   }, []);
 
-  return { friends, loading, error };
+  const refetch = async () => {
+    try {
+      setError(null);
+      const friendsData = await api.getFriends();
+      setFollowData(friendsData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load friends');
+      console.error('Friends refetch error:', err);
+    }
+  };
+
+  return { 
+    followData, 
+    loading, 
+    error, 
+    refetch,
+    // For backward compatibility, still provide friends as array
+    friends: followData?.mutualFriends || []
+  };
+};
+
+// Custom hook for follow operations
+export const useFollow = () => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const followUser = async (userId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await api.followUser(userId);
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to follow user';
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const unfollowUser = async (userId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await api.unfollowUser(userId);
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to unfollow user';
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { followUser, unfollowUser, loading, error };
+};
+
+// Custom hook for new followers notifications
+export const useNewFollowers = () => {
+  const [data, setData] = useState<NewFollowersData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchNewFollowers = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const newFollowersData = await api.getNewFollowers();
+        setData(newFollowersData);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load new followers');
+        console.error('New followers error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNewFollowers();
+  }, []);
+
+  const refetch = async () => {
+    try {
+      setError(null);
+      const newFollowersData = await api.getNewFollowers();
+      setData(newFollowersData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load new followers');
+      console.error('New followers refetch error:', err);
+    }
+  };
+
+  const markAsChecked = async () => {
+    try {
+      setError(null);
+      await api.markFollowersChecked();
+      // Refetch to get updated counts
+      await refetch();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to mark followers as checked');
+      console.error('Mark followers checked error:', err);
+    }
+  };
+
+  return { data, loading, error, refetch, markAsChecked };
 };

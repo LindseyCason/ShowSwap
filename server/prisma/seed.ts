@@ -45,12 +45,17 @@ const shows: SeedShow[] = [
   { title: "The Morning Show", platform: "Apple TV+" },
 ];
 
-// ---- FRIENDSHIPS (pairs of usernames) --------------------------------
-const friendships: [string, string][] = [
-  ["lindsey", "alex"],
-  ["lindsey", "sam"],
-  ["alex", "sam"],
-  ["lindsey", "taylor"],
+// ---- FOLLOW RELATIONSHIPS (who follows whom) ---------------------------
+const follows: [string, string][] = [
+  // [follower, following] - person who follows, person being followed
+  ["lindsey", "alex"],    // lindsey follows alex
+  ["alex", "lindsey"],    // alex follows lindsey (mutual)
+  ["lindsey", "sam"],     // lindsey follows sam
+  ["sam", "lindsey"],     // sam follows lindsey (mutual)
+  ["alex", "sam"],        // alex follows sam
+  ["sam", "alex"],        // sam follows alex (mutual)
+  ["lindsey", "taylor"],  // lindsey follows taylor (one-way)
+  ["taylor", "alex"],     // taylor follows alex (one-way)
 ];
 
 // ---- USER SHOW ENTRIES (statuses + ratings) --------------------------
@@ -107,11 +112,10 @@ function sortPair(a: string, b: string): [string, string] {
   return a < b ? [a, b] : [b, a];
 }
 
-async function upsertFriendship(userAId: string, userBId: string) {
-  const [A, B] = sortPair(userAId, userBId);
-  await prisma.friendship.upsert({
-    where: { userAId_userBId: { userAId: A, userBId: B } },
-    create: { userAId: A, userBId: B },
+async function upsertFollow(followerId: string, followingId: string) {
+  await prisma.follow.upsert({
+    where: { followerId_followingId: { followerId, followingId } },
+    create: { followerId, followingId },
     update: {},
   });
 }
@@ -180,11 +184,11 @@ async function main() {
     showKeyToId.set(`${s.title}|${s.platform}`, id);
   }
 
-  // Friendships
-  for (const [u1, u2] of friendships) {
-    const a = userIdByName.get(u1)!;
-    const b = userIdByName.get(u2)!;
-    await upsertFriendship(a, b);
+  // Follow relationships
+  for (const [follower, following] of follows) {
+    const followerId = userIdByName.get(follower)!;
+    const followingId = userIdByName.get(following)!;
+    await upsertFollow(followerId, followingId);
   }
 
   // UserShows + Ratings
@@ -204,8 +208,28 @@ async function main() {
     }
   }
 
-  // Compute compatibility for every friendship
-  for (const [u1, u2] of friendships) {
+  // Get all mutual follow relationships for compatibility calculation
+  const mutualPairs: [string, string][] = [];
+  const followMap = new Map<string, Set<string>>(); // follower -> set of people they follow
+  
+  // Build the follow map
+  for (const [follower, following] of follows) {
+    if (!followMap.has(follower)) {
+      followMap.set(follower, new Set());
+    }
+    followMap.get(follower)!.add(following);
+  }
+  
+  // Find mutual follows
+  for (const [follower, following] of follows) {
+    const reverseExists = followMap.get(following)?.has(follower);
+    if (reverseExists && follower < following) { // avoid duplicates by checking lexical order
+      mutualPairs.push([follower, following]);
+    }
+  }
+
+  // Compute compatibility for every mutual follow relationship
+  for (const [u1, u2] of mutualPairs) {
     const a = userIdByName.get(u1)!;
     const b = userIdByName.get(u2)!;
     const score = await computeCompatibilityForPair(a, b);

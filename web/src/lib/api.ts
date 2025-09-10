@@ -25,11 +25,28 @@ export interface Friend {
   id: string;
   username: string;
   compatibility: number;
+  isMutual?: boolean;
+  relationship?: 'following' | 'follower';
+  isNew?: boolean;
+  followedAt?: string;
+}
+
+export interface FollowData {
+  following: Friend[];
+  followers: Friend[];
+  mutualFriends: Friend[];
 }
 
 export interface CompatibleFriend {
   friend: Friend;
   compatibility: number;
+}
+
+export interface NewFollowersData {
+  count: number;
+  hasNewFollowers: boolean;
+  newFollowers: User[];
+  lastChecked: string | null;
 }
 
 export interface DashboardData {
@@ -113,13 +130,67 @@ export const getUserLists = async (): Promise<UserLists> => {
 };
 
 // Friends API
-export const getFriends = async (): Promise<Friend[]> => {
+export const getFriends = async (): Promise<FollowData> => {
   const response = await fetch(`${API_BASE_URL}/api/friends`, {
     credentials: 'include',
   });
   
   if (!response.ok) {
     throw new Error('Failed to get friends');
+  }
+  
+  return response.json();
+};
+
+// Follow/Unfollow API
+export const followUser = async (userId: string): Promise<{ success: boolean; message: string }> => {
+  const response = await fetch(`${API_BASE_URL}/api/follow/${userId}`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to follow user');
+  }
+  
+  return response.json();
+};
+
+export const unfollowUser = async (userId: string): Promise<{ success: boolean; message: string }> => {
+  const response = await fetch(`${API_BASE_URL}/api/follow/${userId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to unfollow user');
+  }
+  
+  return response.json();
+};
+
+// New followers notification API
+export const getNewFollowers = async (): Promise<NewFollowersData> => {
+  const response = await fetch(`${API_BASE_URL}/api/followers/new`, {
+    credentials: 'include',
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to get new followers data');
+  }
+  
+  return response.json();
+};
+
+// Mark followers as checked
+export const markFollowersChecked = async (): Promise<{ success: boolean; checkedAt: string }> => {
+  const response = await fetch(`${API_BASE_URL}/api/followers/mark-checked`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to mark followers as checked');
   }
   
   return response.json();

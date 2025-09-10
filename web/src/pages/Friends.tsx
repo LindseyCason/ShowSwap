@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useFriends } from '../lib/hooks'
+import { useFriends, useFollow, useNewFollowers } from '../lib/hooks'
 import UserProfile from '../components/UserProfile'
-import { getUserProfile, searchUsers, addFriend, removeFriend, recalculateCompatibility } from '../lib/api'
+import { getUserProfile, searchUsers, recalculateCompatibility } from '../lib/api'
 import type { User, ShowWithRating, Friend } from '../lib/api'
 
 // Helper function to capitalize username
@@ -10,7 +10,9 @@ const capitalizeUsername = (username: string): string => {
 };
 
 export default function Friends() {
-  const { friends, loading, error } = useFriends()
+  const { followData, loading, error, refetch } = useFriends()
+  const { followUser: followUserAction, unfollowUser: unfollowUserAction } = useFollow()
+  const { markAsChecked } = useNewFollowers()
   
   // User profile modal state
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
@@ -25,12 +27,25 @@ export default function Friends() {
   const [searchLoading, setSearchLoading] = useState(false)
   const [addingFriend, setAddingFriend] = useState<string | null>(null)
 
-  // Remove friend confirmation state
-  const [removingFriend, setRemovingFriend] = useState<Friend | null>(null)
-  const [isRemoving, setIsRemoving] = useState(false)
+  // Remove friend confirmation state - now for unfollow
+  const [unfollowingUser, setUnfollowingUser] = useState<Friend | null>(null)
+  const [isUnfollowing, setIsUnfollowing] = useState(false)
 
-  const refetch = () => {
-    window.location.reload() // Simple refetch for now
+  // Active tab state
+  const [activeTab, setActiveTab] = useState<'following' | 'followers'>('following')
+
+  // Handle tab switching and mark followers as checked
+  const handleTabSwitch = async (tab: 'following' | 'followers') => {
+    setActiveTab(tab)
+    
+    // If switching to followers tab, mark them as checked
+    if (tab === 'followers') {
+      try {
+        await markAsChecked()
+      } catch (error) {
+        console.error('Failed to mark followers as checked:', error)
+      }
+    }
   }
 
   const handleSearch = async (query: string) => {
@@ -56,13 +71,13 @@ export default function Friends() {
   const handleAddFriend = async (userId: string) => {
     setAddingFriend(userId)
     try {
-      await addFriend(userId)
-      // Remove the user from search results since they're now a friend
+      await followUserAction(userId)
+      // Remove the user from search results since they're now being followed
       setSearchResults(prev => prev.filter(user => user.id !== userId))
       // Refetch friends list
       refetch()
     } catch (error) {
-      console.error('Failed to add friend:', error)
+      console.error('Failed to follow user:', error)
     } finally {
       setAddingFriend(null)
     }
@@ -88,30 +103,88 @@ export default function Friends() {
     }
   }
 
-  const handleRemoveFriendClick = (friend: Friend, event: React.MouseEvent) => {
+  const handleUnfollowClick = (friend: Friend, event: React.MouseEvent) => {
     event.stopPropagation() // Prevent opening the profile modal
-    setRemovingFriend(friend)
+    setUnfollowingUser(friend)
   }
 
-  const handleConfirmRemoveFriend = async () => {
-    if (!removingFriend) return
+  const handleConfirmUnfollow = async () => {
+    if (!unfollowingUser) return
     
-    setIsRemoving(true)
+    setIsUnfollowing(true)
     try {
-      await removeFriend(removingFriend.id)
-      setRemovingFriend(null)
+      await unfollowUserAction(unfollowingUser.id)
+      setUnfollowingUser(null)
       refetch() // Refresh the friends list
     } catch (error) {
-      console.error('Failed to remove friend:', error)
+      console.error('Failed to unfollow user:', error)
     } finally {
-      setIsRemoving(false)
+      setIsUnfollowing(false)
     }
   }
 
-  const handleCancelRemoveFriend = () => {
-    setRemovingFriend(null)
+  const handleCancelUnfollow = () => {
+    setUnfollowingUser(null)
   }
 
+  // Get current data based on active tab
+  const getCurrentData = () => {
+    if (!followData) return []
+    switch (activeTab) {
+      case 'following':
+        // Show all users being followed, including mutual connections
+        return followData.following
+      case 'followers':
+        // Show all followers, including mutual connections
+        return followData.followers
+      default:
+        return []
+    }
+  }
+
+  const currentData = getCurrentData()
+  const totalFollowing = followData?.following?.length || 0
+  const totalFollowers = followData?.followers?.length || 0
+
+  // Get button text based on relationship and tab
+  const getActionButton = (friend: Friend) => {
+    if (activeTab === 'following') {
+      return (
+        <button
+          onClick={(event) => handleUnfollowClick(friend, event)}
+          className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+        >
+          Unfollow
+        </button>
+      )
+    } else if (activeTab === 'followers') {
+      if (friend.isMutual) {
+        return (
+          <button
+            onClick={(event) => handleUnfollowClick(friend, event)}
+            className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+          >
+            Unfollow
+          </button>
+        )
+      } else {
+        return (
+          <button
+            onClick={(event) => {
+              event.stopPropagation()
+              handleAddFriend(friend.id)
+            }}
+            disabled={addingFriend === friend.id}
+            className="px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50"
+          >
+            {addingFriend === friend.id ? 'Following...' : 'Follow Back'}
+          </button>
+        )
+      }
+    }
+    return null
+  }
+  
   const handleUserClick = async (friend: Friend) => {
     setProfileLoading(true)
     const userForModal: User = {
@@ -197,9 +270,35 @@ export default function Friends() {
           </p>
         </div>
 
-        {friends && friends.length > 0 ? (
+        {/* Tab Navigation */}
+        <div className="mb-6">
+          <nav className="flex space-x-8">
+            <button
+              onClick={() => handleTabSwitch('following')}
+              className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                activeTab === 'following' 
+                  ? 'bg-blue-100 text-blue-700' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Following ({totalFollowing})
+            </button>
+            <button
+              onClick={() => handleTabSwitch('followers')}
+              className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                activeTab === 'followers' 
+                  ? 'bg-blue-100 text-blue-700' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Followers ({totalFollowers})
+            </button>
+          </nav>
+        </div>
+
+        {currentData && currentData.length > 0 ? (
           <div className="space-y-4">
-            {/* Find More Friends Button */}
+            {/* Action buttons */}
             <div className="flex justify-between items-center">
               <button
                 onClick={handleRecalculateCompatibility}
@@ -215,7 +314,7 @@ export default function Friends() {
               </button>
             </div>
             
-            {friends.map((friend) => (
+            {currentData.map((friend) => (
               <div 
                 key={friend.id} 
                 className="bg-white rounded-lg shadow hover:shadow-md transition-shadow cursor-pointer"
@@ -230,17 +329,26 @@ export default function Friends() {
                         </span>
                       </div>
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-900">{capitalizeUsername(friend.username)}</h3>
-                        <p className="text-sm text-green-600 font-medium">{friend.compatibility}% compatibility</p>
+                        <div className="flex items-center space-x-2">
+                          <h3 className="text-lg font-semibold text-gray-900">{capitalizeUsername(friend.username)}</h3>
+                          {friend.isMutual && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              Mutual
+                            </span>
+                          )}
+                          {friend.isNew && activeTab === 'followers' && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              NEW
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-green-600 font-medium">
+                          {friend.compatibility}% compatibility
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-3">
-                      <button
-                        onClick={(event) => handleRemoveFriendClick(friend, event)}
-                        className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
-                      >
-                        Remove
-                      </button>
+                      {getActionButton(friend)}
                       <span className="text-sm text-gray-500">View Profile</span>
                       <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -258,9 +366,13 @@ export default function Friends() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No friends yet</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              {activeTab === 'following' && 'Not following anyone yet'}
+              {activeTab === 'followers' && 'No followers yet'}
+            </h3>
             <p className="text-gray-600 mb-6">
-              You haven't connected with any friends on ShowSwap yet. Start by adding some friends to see what they're watching!
+              {activeTab === 'following' && 'You aren\'t following anyone yet. Start connecting with other users to see what they\'re watching!'}
+              {activeTab === 'followers' && 'No one is following you yet. Add some shows and start connecting with others!'}
             </p>
             <button 
               onClick={handleFindFriendsClick}
@@ -326,7 +438,7 @@ export default function Friends() {
                         disabled={addingFriend === user.id}
                         className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {addingFriend === user.id ? 'Adding...' : 'Add Friend'}
+                        {addingFriend === user.id ? 'Following...' : 'Follow'}
                       </button>
                     </div>
                   ))}
@@ -363,8 +475,8 @@ export default function Friends() {
         mostCompatibleFriend={null}
       />
 
-      {/* Remove Friend Confirmation Modal */}
-      {removingFriend && (
+      {/* Unfollow Confirmation Modal */}
+      {unfollowingUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
             <div className="p-6">
@@ -375,37 +487,40 @@ export default function Friends() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Remove Friend</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">Unfollow User</h3>
                   <p className="text-sm text-gray-600">This action cannot be undone</p>
                 </div>
               </div>
               
               <div className="mb-6">
                 <p className="text-gray-700">
-                  Are you sure you want to remove <strong>{capitalizeUsername(removingFriend.username)}</strong> from your friends list?
+                  Are you sure you want to unfollow <strong>{capitalizeUsername(unfollowingUser.username)}</strong>?
                 </p>
                 <p className="text-sm text-gray-600 mt-2">
-                  • They will no longer see you on their friends list either
+                  • They will no longer appear in your Following list
                 </p>
                 <p className="text-sm text-gray-600">
-                  • To re-add them, you'll need to search for their username again
+                  • If they were a mutual friend, they'll move to your Followers list
+                </p>
+                <p className="text-sm text-gray-600">
+                  • You can follow them again anytime
                 </p>
               </div>
               
               <div className="flex justify-end space-x-3">
                 <button
-                  onClick={handleCancelRemoveFriend}
-                  disabled={isRemoving}
+                  onClick={handleCancelUnfollow}
+                  disabled={isUnfollowing}
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={handleConfirmRemoveFriend}
-                  disabled={isRemoving}
+                  onClick={handleConfirmUnfollow}
+                  disabled={isUnfollowing}
                   className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 transition-colors"
                 >
-                  {isRemoving ? 'Removing...' : 'Remove Friend'}
+                  {isUnfollowing ? 'Unfollowing...' : 'Unfollow'}
                 </button>
               </div>
             </div>
