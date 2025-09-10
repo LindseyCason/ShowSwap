@@ -38,6 +38,14 @@ app.post('/api/auth/login', (req, res) => {
       return res.status(400).json({ error: 'Username is required' });
     }
 
+    // Validate username with regex
+    const usernameRegex = /^(?=.{3,30}$)(?!.*[_.]{2})[a-zA-Z][a-zA-Z0-9._]*[a-zA-Z0-9]$/;
+    if (!usernameRegex.test(username)) {
+      return res.status(400).json({ 
+        error: 'Username must be 3-30 characters, start with a letter, end with a letter or number, and cannot have consecutive underscores or periods' 
+      });
+    }
+
     let user = users.get(username);
     if (!user) {
       user = {
