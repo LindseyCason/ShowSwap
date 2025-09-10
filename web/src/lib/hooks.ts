@@ -235,5 +235,17 @@ export const useNewFollowers = () => {
     }
   };
 
-  return { data, loading, error, refetch };
+  const markAsChecked = async () => {
+    try {
+      setError(null);
+      await api.markFollowersChecked();
+      // Refetch to get updated counts
+      await refetch();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to mark followers as checked');
+      console.error('Mark followers checked error:', err);
+    }
+  };
+
+  return { data, loading, error, refetch, markAsChecked };
 };

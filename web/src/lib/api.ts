@@ -27,6 +27,8 @@ export interface Friend {
   compatibility: number;
   isMutual?: boolean;
   relationship?: 'following' | 'follower';
+  isNew?: boolean;
+  followedAt?: string;
 }
 
 export interface FollowData {
@@ -43,6 +45,8 @@ export interface CompatibleFriend {
 export interface NewFollowersData {
   count: number;
   hasNewFollowers: boolean;
+  newFollowers: User[];
+  lastChecked: string | null;
 }
 
 export interface DashboardData {
@@ -173,6 +177,20 @@ export const getNewFollowers = async (): Promise<NewFollowersData> => {
   
   if (!response.ok) {
     throw new Error('Failed to get new followers data');
+  }
+  
+  return response.json();
+};
+
+// Mark followers as checked
+export const markFollowersChecked = async (): Promise<{ success: boolean; checkedAt: string }> => {
+  const response = await fetch(`${API_BASE_URL}/api/followers/mark-checked`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to mark followers as checked');
   }
   
   return response.json();

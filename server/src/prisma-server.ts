@@ -141,6 +141,12 @@ app.get('/api/friends', async (req, res) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
+    // Get user's last followers check time for "new" determination
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { lastFollowersCheck: true }
+    });
+
     // Get users that the current user is following
     const following = await prisma.follow.findMany({
       where: { followerId: userId },
@@ -149,12 +155,13 @@ app.get('/api/friends', async (req, res) => {
       }
     });
 
-    // Get users that are following the current user
+    // Get users that are following the current user (with timestamps)
     const followers = await prisma.follow.findMany({
       where: { followingId: userId },
       include: {
         follower: { select: { id: true, username: true } }
-      }
+      },
+      orderBy: { createdAt: 'desc' } // Most recent followers first
     });
 
     // Get compatibility scores for all users I'm following
@@ -197,18 +204,25 @@ app.get('/api/friends', async (req, res) => {
       };
     });
 
-    // Return all followers data (including mutual connections)
+    // Return all followers data (including mutual connections and new status)
     const followersData = followers.map(follow => {
       const user = follow.follower;
       const isMutual = followingIds.has(user.id);
       const compatibility = compatibilityMap.get(user.id) || 0;
+      
+      // Determine if this follower is "new" based on lastFollowersCheck
+      const isNew = currentUser?.lastFollowersCheck 
+        ? follow.createdAt > currentUser.lastFollowersCheck
+        : true; // If never checked, all are "new"
       
       return {
         id: user.id,
         username: user.username,
         compatibility,
         isMutual,
-        relationship: 'follower'
+        relationship: 'follower',
+        isNew,
+        followedAt: follow.createdAt
       };
     });
 
@@ -479,20 +493,75 @@ app.get('/api/followers/new', async (req, res) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    // For now, we'll consider all followers as "new" 
-    // In a real app, you'd track when the user last checked
+    // Get user's last followers check time
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { lastFollowersCheck: true }
+    });
+
+    // If user has never checked, consider all followers as new
+    // Otherwise, only count followers who followed after the last check
     const newFollowersCount = await prisma.follow.count({
-      where: { followingId: userId }
+      where: { 
+        followingId: userId,
+        createdAt: user?.lastFollowersCheck 
+          ? { gt: user.lastFollowersCheck }
+          : undefined
+      }
+    });
+
+    // Get the actual new followers for display
+    const newFollowers = await prisma.follow.findMany({
+      where: { 
+        followingId: userId,
+        createdAt: user?.lastFollowersCheck 
+          ? { gt: user.lastFollowersCheck }
+          : undefined
+      },
+      include: {
+        follower: {
+          select: {
+            id: true,
+            username: true,
+            avatarUrl: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
     });
 
     res.json({
       count: newFollowersCount,
-      hasNewFollowers: newFollowersCount > 0
+      hasNewFollowers: newFollowersCount > 0,
+      newFollowers: newFollowers.map(follow => follow.follower),
+      lastChecked: user?.lastFollowersCheck
     });
 
   } catch (error) {
     console.error('Get new followers error:', error);
     res.status(500).json({ error: 'Failed to get new followers' });
+  }
+});
+
+// Mark followers as checked (update lastFollowersCheck timestamp)
+app.post('/api/followers/mark-checked', async (req, res) => {
+  try {
+    const userId = (req.session as any)?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Update the user's lastFollowersCheck timestamp
+    await prisma.user.update({
+      where: { id: userId },
+      data: { lastFollowersCheck: new Date() }
+    });
+
+    res.json({ success: true, checkedAt: new Date() });
+
+  } catch (error) {
+    console.error('Mark followers checked error:', error);
+    res.status(500).json({ error: 'Failed to mark followers as checked' });
   }
 });
 

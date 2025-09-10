@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/UserContext'
+import { useNewFollowers } from '../lib/hooks'
 import { logout } from '../lib/api'
 
 // Helper function to capitalize username
@@ -12,6 +13,7 @@ export default function Navigation() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, clearUser } = useAuth()
+  const { data: newFollowersData } = useNewFollowers()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const handleLogout = async () => {
@@ -78,13 +80,18 @@ export default function Navigation() {
             </button>
             <button
               onClick={() => navigate('/friends')}
-              className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+              className={`relative px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                 isActive('/friends') 
                   ? 'text-blue-600 bg-blue-50' 
                   : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
               }`}
             >
               Friends
+              {newFollowersData?.hasNewFollowers && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {newFollowersData.count > 9 ? '9+' : newFollowersData.count}
+                </span>
+              )}
             </button>
           </div>
 
@@ -172,13 +179,18 @@ export default function Navigation() {
                   navigate('/friends')
                   setIsMobileMenuOpen(false)
                 }}
-                className={`block px-3 py-2 text-base font-medium rounded-md w-full text-left transition-colors ${
+                className={`relative block px-3 py-2 text-base font-medium rounded-md w-full text-left transition-colors ${
                   isActive('/friends') 
                     ? 'text-blue-600 bg-blue-50' 
                     : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
                 }`}
               >
                 Friends
+                {newFollowersData?.hasNewFollowers && (
+                  <span className="absolute top-1 right-3 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {newFollowersData.count > 9 ? '9+' : newFollowersData.count}
+                  </span>
+                )}
               </button>
               
               {/* Mobile User Menu */}

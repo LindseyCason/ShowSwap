@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useFriends, useFollow } from '../lib/hooks'
+import { useFriends, useFollow, useNewFollowers } from '../lib/hooks'
 import UserProfile from '../components/UserProfile'
-import { getUserProfile, searchUsers, followUser, unfollowUser, recalculateCompatibility } from '../lib/api'
+import { getUserProfile, searchUsers, recalculateCompatibility } from '../lib/api'
 import type { User, ShowWithRating, Friend } from '../lib/api'
 
 // Helper function to capitalize username
@@ -11,7 +11,8 @@ const capitalizeUsername = (username: string): string => {
 
 export default function Friends() {
   const { followData, loading, error, refetch } = useFriends()
-  const { followUser: followUserAction, unfollowUser: unfollowUserAction, loading: followLoading } = useFollow()
+  const { followUser: followUserAction, unfollowUser: unfollowUserAction } = useFollow()
+  const { markAsChecked } = useNewFollowers()
   
   // User profile modal state
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
@@ -32,6 +33,20 @@ export default function Friends() {
 
   // Active tab state
   const [activeTab, setActiveTab] = useState<'following' | 'followers'>('following')
+
+  // Handle tab switching and mark followers as checked
+  const handleTabSwitch = async (tab: 'following' | 'followers') => {
+    setActiveTab(tab)
+    
+    // If switching to followers tab, mark them as checked
+    if (tab === 'followers') {
+      try {
+        await markAsChecked()
+      } catch (error) {
+        console.error('Failed to mark followers as checked:', error)
+      }
+    }
+  }
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query)
@@ -259,7 +274,7 @@ export default function Friends() {
         <div className="mb-6">
           <nav className="flex space-x-8">
             <button
-              onClick={() => setActiveTab('following')}
+              onClick={() => handleTabSwitch('following')}
               className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                 activeTab === 'following' 
                   ? 'bg-blue-100 text-blue-700' 
@@ -269,7 +284,7 @@ export default function Friends() {
               Following ({totalFollowing})
             </button>
             <button
-              onClick={() => setActiveTab('followers')}
+              onClick={() => handleTabSwitch('followers')}
               className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                 activeTab === 'followers' 
                   ? 'bg-blue-100 text-blue-700' 
@@ -319,6 +334,11 @@ export default function Friends() {
                           {friend.isMutual && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                               Mutual
+                            </span>
+                          )}
+                          {friend.isNew && activeTab === 'followers' && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              NEW
                             </span>
                           )}
                         </div>

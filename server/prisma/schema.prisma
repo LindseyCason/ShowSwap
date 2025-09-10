@@ -11,21 +11,22 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  username      String   @unique
-  avatarUrl     String?
-  createdAt     DateTime @default(now())
+  id                   String   @id @default(cuid())
+  username             String   @unique
+  avatarUrl            String?
+  createdAt            DateTime @default(now())
+  lastFollowersCheck   DateTime? // Track when user last checked their followers
   // relations
-  friendsA      Friendship[] @relation("UserA")
-  friendsB      Friendship[] @relation("UserB")
-  shows         UserShow[]
-  ratings       Rating[]
-  sessions      Session[]
-  compatScoresA Compatibility[] @relation("UserA_Compat")
-  compatScoresB Compatibility[] @relation("UserB_Compat")
+  friendsA             Friendship[] @relation("UserA")
+  friendsB             Friendship[] @relation("UserB")
+  shows                UserShow[]
+  ratings              Rating[]
+  sessions             Session[]
+  compatScoresA        Compatibility[] @relation("UserA_Compat")
+  compatScoresB        Compatibility[] @relation("UserB_Compat")
   // follow relationships
-  following     Follow[] @relation("UserFollowing")
-  followers     Follow[] @relation("UserFollowers")
+  following            Follow[] @relation("UserFollowing")
+  followers            Follow[] @relation("UserFollowers")
 }
 
 model Session {
