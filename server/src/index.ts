@@ -38,18 +38,39 @@ app.post('/api/auth/login', (req, res) => {
       return res.status(400).json({ error: 'Username is required' });
     }
 
-    let user = users.get(username);
-    if (!user) {
-      user = {
+    // Validate username with regex
+    const usernameRegex = /^(?=.{3,30}$)(?!.*[_.]{2})[a-zA-Z][a-zA-Z0-9._]*[a-zA-Z0-9]$/;
+    if (!usernameRegex.test(username)) {
+      return res.status(400).json({ 
+        error: 'Username must be 3-30 characters, start with a letter, end with a letter or number, and cannot have consecutive underscores or periods' 
+      });
+    }
+
+    // Check for existing user with case-insensitive comparison
+    const normalizedUsername = username.toLowerCase();
+    let existingUser = null;
+    for (const [key, user] of users.entries()) {
+      if (key.toLowerCase() === normalizedUsername) {
+        existingUser = user;
+        break;
+      }
+    }
+
+    if (existingUser) {
+      // User exists, log them in
+      (req.session as any).userId = existingUser.id;
+      res.json({ user: existingUser });
+    } else {
+      // Create new user with original case preserved
+      const newUser = {
         id: `user_${Date.now()}_${Math.random()}`,
         username,
         createdAt: new Date().toISOString()
       };
-      users.set(username, user);
+      users.set(username, newUser);
+      (req.session as any).userId = newUser.id;
+      res.json({ user: newUser });
     }
-
-    (req.session as any).userId = user.id;
-    res.json({ user });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Login failed' });

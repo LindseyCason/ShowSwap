@@ -1,11 +1,13 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../lib/UserContext'
 
 export default function Login() {
   const [username, setUsername] = useState('')
   const [loading, setLoading] = useState(false)
   const [apiTest, setApiTest] = useState('')
   const navigate = useNavigate()
+  const { refreshUser } = useAuth()
 
   const testAPI = async () => {
     try {
@@ -19,7 +21,17 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!username.trim()) return
+    const usernameRegex = /^(?=.{3,30}$)(?!.*[_.]{2})[a-zA-Z][a-zA-Z0-9._]*[a-zA-Z0-9]$/
+    
+    if (!username.trim()) {
+      alert('Username is required')
+      return
+    }
+    
+    if (!usernameRegex.test(username.trim())) {
+      alert('Username must be 3-30 characters, start with a letter, end with a letter or number, and cannot have consecutive underscores or periods')
+      return
+    }
 
     setLoading(true)
     try {
@@ -33,9 +45,11 @@ export default function Login() {
       })
 
       if (response.ok) {
+        await refreshUser() // Refresh user data after successful login
         navigate('/')
       } else {
-        alert('Login failed')
+        const errorData = await response.json()
+        alert(errorData.error || 'Login failed')
       }
     } catch (error) {
       console.error('Login error:', error)
@@ -61,10 +75,12 @@ export default function Login() {
             <input
               type="text"
               required
+              pattern="^(?=.{3,30}$)(?!.*[_.]{2})[a-zA-Z][a-zA-Z0-9._]*[a-zA-Z0-9]$"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-              placeholder="Enter your username"
+              placeholder="Enter your username (3-30 characters)"
+              title="Username must be 3-30 characters, start with a letter, end with a letter or number, and cannot have consecutive underscores or periods"
             />
           </div>
           <button

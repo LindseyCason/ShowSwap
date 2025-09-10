@@ -56,13 +56,30 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Username is required' });
     }
 
-    // Find or create user
-    let user = await prisma.user.findUnique({
-      where: { username },
+    // Validate username with regex
+    const usernameRegex = /^(?=.{3,30}$)(?!.*[_.]{2})[a-zA-Z][a-zA-Z0-9._]*[a-zA-Z0-9]$/;
+    if (!usernameRegex.test(username)) {
+      return res.status(400).json({ 
+        error: 'Username must be 3-30 characters, start with a letter, end with a letter or number, and cannot have consecutive underscores or periods' 
+      });
+    }
+
+    // Check for existing user with case-insensitive comparison
+    const existingUsers = await prisma.user.findMany({
       select: { id: true, username: true, createdAt: true }
     });
 
-    if (!user) {
+    const normalizedUsername = username.toLowerCase();
+    const existingUser = existingUsers.find(user => 
+      user.username.toLowerCase() === normalizedUsername
+    );
+
+    let user;
+    if (existingUser) {
+      // User exists, use the existing user
+      user = existingUser;
+    } else {
+      // Create new user with original case preserved
       user = await prisma.user.create({
         data: { username },
         select: { id: true, username: true, createdAt: true }

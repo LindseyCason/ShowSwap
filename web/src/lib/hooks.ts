@@ -86,25 +86,35 @@ export const useCurrentUser = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const userData = await api.getCurrentUser();
-        setUser(userData.user);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load user');
-        console.error('User error:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchUser = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const userData = await api.getCurrentUser();
+      setUser(userData.user);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load user');
+      setUser(null); // Clear user on error
+      console.error('User error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchUser();
   }, []);
 
-  return { user, loading, error, setUser };
+  const refreshUser = () => {
+    fetchUser();
+  };
+
+  const clearUser = () => {
+    setUser(null);
+    setError(null);
+  };
+
+  return { user, loading, error, setUser, refreshUser, clearUser };
 };
 
 // Custom hook for friends
