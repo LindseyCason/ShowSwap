@@ -29,6 +29,27 @@ export default function UserProfile({
   const [currentUserShows, setCurrentUserShows] = useState<(ShowWithRating & { status: string })[]>([])
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({})
   const [successMessages, setSuccessMessages] = useState<Record<string, string>>({})
+  const [currentPage, setCurrentPage] = useState(0)
+
+  // Pagination calculations
+  const itemsPerPage = 5;
+  const totalPages = userShows ? Math.ceil(userShows.length / itemsPerPage) : 0;
+  const currentItems = userShows ? userShows.slice(currentPage * itemsPerPage, (currentPage + 1) * itemsPerPage) : [];
+  const isFirstPage = currentPage === 0;
+  const isLastPage = currentPage === totalPages - 1;
+  const isOnlyOnePage = totalPages <= 1;
+
+  const handlePrevious = () => {
+    if (!isFirstPage) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNext = () => {
+    if (!isLastPage) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
 
   // Debug logging - can be removed once everything is working
   // console.log('UserProfile Debug Info:');
@@ -50,6 +71,7 @@ export default function UserProfile({
     }
 
     if (isOpen) {
+      setCurrentPage(0) // Reset to first page when modal opens
       loadCurrentUserShows()
     }
   }, [isOpen])
@@ -219,11 +241,46 @@ export default function UserProfile({
         <div className="p-6">
           {userShows && userShows.length > 0 ? (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                {user.username}'s Shows ({userShows.length})
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {user.username}'s Shows ({userShows.length})
+                </h3>
+                {!isOnlyOnePage && (
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={handlePrevious}
+                      disabled={isFirstPage}
+                      className={`p-1 rounded ${
+                        isFirstPage 
+                          ? 'text-gray-300 cursor-not-allowed' 
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <span className="text-sm text-gray-500">
+                      {currentPage + 1} / {totalPages}
+                    </span>
+                    <button
+                      onClick={handleNext}
+                      disabled={isLastPage}
+                      className={`p-1 rounded ${
+                        isLastPage 
+                          ? 'text-gray-300 cursor-not-allowed' 
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
               <div className="space-y-3">
-                {userShows.map((show) => (
+                {currentItems.map((show) => (
                   <div key={show.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex-1">
                       <h4 className="font-medium text-gray-900">{show.title}</h4>
@@ -298,12 +355,52 @@ export default function UserProfile({
 
         {/* Footer */}
         <div className="p-6 border-t border-gray-200 bg-gray-50">
-          <button
-            onClick={onClose}
-            className="w-full bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 transition-colors"
-          >
-            Close
-          </button>
+          <div className="flex items-center justify-between">
+            {/* Pagination controls on the left */}
+            {userShows && userShows.length > 0 && !isOnlyOnePage ? (
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={handlePrevious}
+                  disabled={isFirstPage}
+                  className={`p-1 rounded ${
+                    isFirstPage 
+                      ? 'text-gray-300 cursor-not-allowed' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <span className="text-sm text-gray-500">
+                  {currentPage + 1} / {totalPages}
+                </span>
+                <button
+                  onClick={handleNext}
+                  disabled={isLastPage}
+                  className={`p-1 rounded ${
+                    isLastPage 
+                      ? 'text-gray-300 cursor-not-allowed' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <div></div>
+            )}
+            
+            {/* Close button on the right */}
+            <button
+              onClick={onClose}
+              className="bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 transition-colors"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>
