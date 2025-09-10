@@ -4,6 +4,11 @@ import UserProfile from '../components/UserProfile'
 import { getUserProfile, searchUsers, addFriend, recalculateCompatibility } from '../lib/api'
 import type { User, ShowWithRating, Friend } from '../lib/api'
 
+// Helper function to capitalize username
+const capitalizeUsername = (username: string): string => {
+  return username.charAt(0).toUpperCase() + username.slice(1).toLowerCase();
+};
+
 export default function Friends() {
   const { friends, loading, error } = useFriends()
   
@@ -197,7 +202,7 @@ export default function Friends() {
                         </span>
                       </div>
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-900">{friend.username}</h3>
+                        <h3 className="text-lg font-semibold text-gray-900">{capitalizeUsername(friend.username)}</h3>
                         <p className="text-sm text-green-600 font-medium">{friend.compatibility}% compatibility</p>
                       </div>
                     </div>
@@ -280,7 +285,7 @@ export default function Friends() {
                             {user.username.charAt(0).toUpperCase()}
                           </span>
                         </div>
-                        <span className="text-sm font-medium text-gray-900">{user.username}</span>
+                        <span className="text-sm font-medium text-gray-900">{capitalizeUsername(user.username)}</span>
                       </div>
                       <button
                         onClick={() => handleAddFriend(user.id)}

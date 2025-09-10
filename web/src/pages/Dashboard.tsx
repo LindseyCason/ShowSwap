@@ -7,6 +7,11 @@ import { useState } from 'react'
 import { getUserProfile, updateShowStatus } from '../lib/api'
 import type { User, ShowWithRating, Friend, CompatibleFriend } from '../lib/api'
 
+// Helper function to capitalize username
+const capitalizeUsername = (username: string): string => {
+  return username.charAt(0).toUpperCase() + username.slice(1).toLowerCase();
+};
+
 const LoadingCard = ({ title }: { title: string }) => (
   <div className="bg-white rounded-lg shadow p-6">
     <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
@@ -260,7 +265,7 @@ export default function Dashboard() {
         <div className="max-w-6xl mx-auto py-8 px-4">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900">ShowSwap Dashboard</h1>
-            <p className="text-gray-600">Welcome back{user ? `, ${user.username}` : ''}!</p>
+            <p className="text-gray-600">Welcome back{user ? `, ${capitalizeUsername(user.username)}` : ''}!</p>
           </div>
           <div className="bg-white rounded-lg shadow p-6 text-center">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Authentication Required</h3>
@@ -282,7 +287,7 @@ export default function Dashboard() {
       <div className="max-w-6xl mx-auto py-8 px-4">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">ShowSwap Dashboard</h1>
-          <p className="text-gray-600">Welcome back{user ? `, ${user.username}` : ''}!</p>
+          <p className="text-gray-600">Welcome back{user ? `, ${capitalizeUsername(user.username)}` : ''}!</p>
         </div>
 
         <div className="space-y-6">
@@ -301,7 +306,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                   <span className="text-sm font-medium text-gray-900">
-                    {friendData.friend.username}
+                    {capitalizeUsername(friendData.friend.username)}
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">

@@ -3,6 +3,11 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/UserContext'
 import { logout } from '../lib/api'
 
+// Helper function to capitalize username
+const capitalizeUsername = (username: string): string => {
+  return username.charAt(0).toUpperCase() + username.slice(1).toLowerCase();
+};
+
 export default function Navigation() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -89,7 +94,7 @@ export default function Navigation() {
               <div className="flex items-center space-x-3">
                 <div className="hidden sm:block">
                   <span className="text-sm text-gray-700">Welcome, </span>
-                  <span className="text-sm font-medium text-gray-900">{user.username}</span>
+                  <span className="text-sm font-medium text-gray-900">{capitalizeUsername(user.username)}</span>
                 </div>
                 <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                   <span className="text-sm font-medium text-blue-600">
