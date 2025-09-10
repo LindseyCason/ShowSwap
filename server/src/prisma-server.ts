@@ -137,8 +137,37 @@ app.get('/api/friends', async (req, res) => {
       }
     });
 
+    // Get compatibility scores for all friends
+    const compatibilities = await prisma.compatibility.findMany({
+      where: {
+        OR: [
+          { userAId: userId },
+          { userBId: userId }
+        ]
+      },
+      select: {
+        userAId: true,
+        userBId: true,
+        score: true
+      }
+    });
+
+    // Create a map of friend ID to compatibility score
+    const compatibilityMap = new Map<string, number>();
+    compatibilities.forEach(comp => {
+      const friendId = comp.userAId === userId ? comp.userBId : comp.userAId;
+      compatibilityMap.set(friendId, comp.score);
+    });
+
     const friends = friendships.map(friendship => {
-      return friendship.userAId === userId ? friendship.userB : friendship.userA;
+      const friend = friendship.userAId === userId ? friendship.userB : friendship.userA;
+      const compatibility = compatibilityMap.get(friend.id) || 0; // Default to 0 if no compatibility score
+      
+      return {
+        id: friend.id,
+        username: friend.username,
+        compatibility
+      };
     });
 
     res.json(friends);

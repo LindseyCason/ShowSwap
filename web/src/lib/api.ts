@@ -24,6 +24,7 @@ export interface ShowWithRating extends Show {
 export interface Friend {
   id: string;
   username: string;
+  compatibility: number;
 }
 
 export interface CompatibleFriend {
