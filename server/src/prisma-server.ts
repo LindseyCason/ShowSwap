@@ -256,6 +256,55 @@ app.post('/api/friends/:friendId', async (req, res) => {
   }
 });
 
+// Remove friend endpoint
+app.delete('/api/friends/:friendId', async (req, res) => {
+  try {
+    const currentUserId = (req.session as any)?.userId;
+    if (!currentUserId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { friendId } = req.params;
+
+    if (!friendId) {
+      return res.status(400).json({ error: 'Friend ID is required' });
+    }
+
+    if (currentUserId === friendId) {
+      return res.status(400).json({ error: 'Cannot remove yourself as a friend' });
+    }
+
+    // Find and delete the friendship
+    const deletedFriendship = await prisma.friendship.deleteMany({
+      where: {
+        OR: [
+          { userAId: currentUserId, userBId: friendId },
+          { userAId: friendId, userBId: currentUserId }
+        ]
+      }
+    });
+
+    if (deletedFriendship.count === 0) {
+      return res.status(404).json({ error: 'Friendship not found' });
+    }
+
+    // Also delete the compatibility score
+    const [userAId, userBId] = currentUserId < friendId ? [currentUserId, friendId] : [friendId, currentUserId];
+    await prisma.compatibility.deleteMany({
+      where: { userAId, userBId }
+    });
+
+    res.json({
+      success: true,
+      message: 'Friend removed successfully'
+    });
+
+  } catch (error) {
+    console.error('Remove friend error:', error);
+    res.status(500).json({ error: 'Failed to remove friend' });
+  }
+});
+
 // Dashboard endpoint
 app.get('/api/dashboard', async (req, res) => {
   try {

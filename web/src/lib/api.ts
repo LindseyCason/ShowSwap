@@ -275,6 +275,23 @@ export const addFriend = async (friendId: string): Promise<{ success: boolean; m
   return response.json();
 };
 
+// Remove friend
+export const removeFriend = async (friendId: string): Promise<{ success: boolean; message: string }> => {
+  const response = await fetch(`${API_BASE_URL}/api/friends/${friendId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to remove friend');
+  }
+
+  return response.json();
+};
+
 // Debug function to recalculate compatibility scores
 export const recalculateCompatibility = async (): Promise<any> => {
   const response = await fetch(`${API_BASE_URL}/api/debug/recalculate-compatibility`, {
