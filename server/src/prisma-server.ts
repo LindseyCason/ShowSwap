@@ -188,6 +188,18 @@ app.get('/api/dashboard', async (req, res) => {
       take: 5
     });
 
+    // Get to watch shows
+    const toWatch = await prisma.userShow.findMany({
+      where: { 
+        userId, 
+        initialStatus: 'ToWatch' 
+      },
+      include: {
+        show: true
+      },
+      orderBy: { addedAt: 'desc' }
+    });
+
     // Get compatible friends
     const compatibleFriends = await prisma.compatibility.findMany({
       where: {
@@ -211,6 +223,10 @@ app.get('/api/dashboard', async (req, res) => {
 
     res.json({
       watchingNow: watchingNow.map(us => ({
+        ...us.show,
+        addedAt: us.addedAt
+      })),
+      toWatch: toWatch.map(us => ({
         ...us.show,
         addedAt: us.addedAt
       })),

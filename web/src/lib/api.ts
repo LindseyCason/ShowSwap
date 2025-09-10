@@ -33,6 +33,7 @@ export interface CompatibleFriend {
 
 export interface DashboardData {
   watchingNow: ShowWithRating[];
+  toWatch: ShowWithRating[];
   recentlyWatched: ShowWithRating[];
   compatibleFriends: CompatibleFriend[];
 }
