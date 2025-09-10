@@ -31,10 +31,21 @@ export const useDashboard = (enabled: boolean = true) => {
     fetchDashboard();
   }, [enabled]);
 
-  return { data, loading, error, refetch: () => {
-    setLoading(true);
-    setError(null);
-  }};
+  const refetch = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const dashboardData = await api.getDashboardData();
+      setData(dashboardData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard');
+      console.error('Dashboard refetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { data, loading, error, refetch };
 };
 
 // Custom hook for user lists
