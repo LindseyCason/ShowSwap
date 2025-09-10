@@ -311,11 +311,14 @@ export default function Dashboard() {
                   <p className="text-sm text-gray-500">{show.platform}</p>
                 </div>
                 <button
-                  onClick={() => setRatingModal({
-                    isOpen: true,
-                    showId: show.id,
-                    showTitle: show.title
-                  })}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setRatingModal({
+                      isOpen: true,
+                      showId: show.id,
+                      showTitle: show.title
+                    });
+                  }}
                   className="ml-3 px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                 >
                   Finished
