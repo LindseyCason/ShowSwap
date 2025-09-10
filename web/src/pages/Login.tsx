@@ -19,7 +19,10 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!username.trim()) return
+    if (!username.trim() || username.trim().length < 3) {
+      alert('Username must be at least 3 characters long')
+      return
+    }
 
     setLoading(true)
     try {
@@ -61,10 +64,11 @@ export default function Login() {
             <input
               type="text"
               required
+              minLength={3}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-              placeholder="Enter your username"
+              placeholder="Enter your username (min 3 characters)"
             />
           </div>
           <button
