@@ -70,7 +70,7 @@ const ShowCard = ({ show, currentTab, onStatusChange, onDelete }: {
             onClick={() => onStatusChange(show.id, 'WatchingNow')}
             className="px-3 py-1 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
           >
-            Start Watching
+            Start
           </button>
         );
       
@@ -81,7 +81,7 @@ const ShowCard = ({ show, currentTab, onStatusChange, onDelete }: {
               onClick={() => onStatusChange(show.id, 'Watched')}
               className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
-              Finished Watching
+              Finished
             </button>
             <button
               onClick={() => onStatusChange(show.id, 'ToWatch')}
