@@ -17,15 +17,15 @@ const LoadingCard = ({ title }: { title: string }) => (
   </div>
 );
 
-interface PaginatedTileProps {
+interface PaginatedTileProps<T> {
   title: string;
-  data: ShowWithRating[] | CompatibleFriend[];
-  onItemClick?: (item: any) => void;
-  renderItem: (item: any) => React.ReactNode;
+  data: T[];
+  onItemClick?: (item: T) => void;
+  renderItem: (item: T) => React.ReactNode;
   emptyMessage: string;
 }
 
-const PaginatedTile = ({ title, data, onItemClick, renderItem, emptyMessage }: PaginatedTileProps) => {
+const PaginatedTile = <T,>({ title, data, onItemClick, renderItem, emptyMessage }: PaginatedTileProps<T>) => {
   const [currentPage, setCurrentPage] = useState(0);
   const itemsPerPage = 5;
   const totalPages = Math.ceil(data.length / itemsPerPage);
