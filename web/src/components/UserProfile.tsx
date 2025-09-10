@@ -30,13 +30,13 @@ export default function UserProfile({
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({})
   const [successMessages, setSuccessMessages] = useState<Record<string, string>>({})
 
-  // Debug logging
-  console.log('UserProfile Debug Info:');
-  console.log('- User:', user);
-  console.log('- User shows:', userShows);
-  console.log('- Number of user shows:', userShows?.length);
-  console.log('- My shows:', currentUserShows);
-  console.log('- Number of my shows:', currentUserShows?.length);
+  // Debug logging - can be removed once everything is working
+  // console.log('UserProfile Debug Info:');
+  // console.log('- User:', user);
+  // console.log('- User shows:', userShows);
+  // console.log('- Number of user shows:', userShows?.length);
+  // console.log('- My shows:', currentUserShows);
+  // console.log('- Number of my shows:', currentUserShows?.length);
 
   // Load current user's shows to check which ones are already added
   useEffect(() => {

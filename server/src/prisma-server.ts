@@ -416,6 +416,7 @@ app.get('/api/users/:userId/profile', async (req, res) => {
     }
 
     const { userId } = req.params;
+    console.log('📋 Profile request for userId:', userId, 'by currentUser:', currentUserId);
 
     // Get user info
     const user = await prisma.user.findUnique({
@@ -427,27 +428,33 @@ app.get('/api/users/:userId/profile', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    console.log('📋 Found user:', user.username);
+
     // Get user's shows with ratings
     const userShows = await prisma.userShow.findMany({
       where: { userId },
       include: {
-        show: true,
-        user: {
-          include: {
-            ratings: {
-              where: { userId }
-            }
-          }
-        }
+        show: true
       },
       orderBy: { addedAt: 'desc' }
     });
 
+    console.log('📋 Found userShows count:', userShows.length);
+
+    // Get all ratings for this user
+    const userRatings = await prisma.rating.findMany({
+      where: { userId }
+    });
+
+    console.log('📋 Found userRatings count:', userRatings.length);
+
     const showsWithRatings = userShows.map(us => ({
       ...us.show,
       addedAt: us.addedAt,
-      rating: us.user.ratings.find(r => r.showId === us.showId)?.stars || null
+      rating: userRatings.find(r => r.showId === us.showId)?.stars || null
     }));
+
+    console.log('📋 Final showsWithRatings count:', showsWithRatings.length);
 
     // Get user's most compatible friend (excluding the current logged-in user)
     const compatibilities = await prisma.compatibility.findMany({
@@ -465,7 +472,19 @@ app.get('/api/users/:userId/profile', async (req, res) => {
     });
 
     let mostCompatibleFriend = null;
+    let currentUserCompatibility = null;
+    
     if (compatibilities.length > 0) {
+      // Find the compatibility between current user and viewed user
+      const directCompatibility = compatibilities.find(comp => 
+        (comp.userAId === currentUserId && comp.userBId === userId) ||
+        (comp.userAId === userId && comp.userBId === currentUserId)
+      );
+      
+      if (directCompatibility) {
+        currentUserCompatibility = directCompatibility.score;
+      }
+      
       // Find the first compatibility that doesn't involve the current logged-in user
       for (const comp of compatibilities) {
         const friendUser = comp.userAId === userId ? comp.userB : comp.userA;
@@ -481,14 +500,120 @@ app.get('/api/users/:userId/profile', async (req, res) => {
       }
     }
 
-    res.json({
+    const responseData = {
       user,
       shows: showsWithRatings,
-      mostCompatibleFriend
-    });
+      mostCompatibleFriend,
+      compatibility: currentUserCompatibility
+    };
+
+    res.json(responseData);
   } catch (error) {
     console.error('User profile error:', error);
     res.status(500).json({ error: 'Failed to get user profile' });
+  }
+});
+
+// Helper function to calculate compatibility between two users
+async function calculateCompatibility(userAId: string, userBId: string) {
+  // Get ratings for both users
+  const [ratingsA, ratingsB] = await Promise.all([
+    prisma.rating.findMany({ 
+      where: { userId: userAId }, 
+      select: { showId: true, stars: true } 
+    }),
+    prisma.rating.findMany({ 
+      where: { userId: userBId }, 
+      select: { showId: true, stars: true } 
+    }),
+  ]);
+
+  // Find mutual shows (shows both users have rated)
+  const ratingsMapA = new Map(ratingsA.map(r => [r.showId, r.stars]));
+  const mutualRatings: { showId: string; starsA: number; starsB: number }[] = [];
+  
+  for (const ratingB of ratingsB) {
+    const starsA = ratingsMapA.get(ratingB.showId);
+    if (typeof starsA === 'number') {
+      mutualRatings.push({ 
+        showId: ratingB.showId, 
+        starsA: starsA, 
+        starsB: ratingB.stars 
+      });
+    }
+  }
+
+  // Need at least 3 mutual ratings to calculate compatibility
+  if (mutualRatings.length < 3) {
+    return null;
+  }
+
+  // Calculate mean absolute difference
+  const differences = mutualRatings.map(m => Math.abs(m.starsA - m.starsB));
+  const meanAbsoluteDifference = differences.reduce((sum, diff) => sum + diff, 0) / differences.length;
+  
+  // Convert to compatibility score (0-100)
+  // MAD of 0 = 100% compatibility, MAD of 4 = 0% compatibility
+  const compatibilityScore = Math.round(100 * (1 - meanAbsoluteDifference / 4));
+  
+  return Math.max(0, Math.min(100, compatibilityScore));
+}
+
+// Endpoint to recalculate compatibilities (for testing/debugging)
+app.post('/api/debug/recalculate-compatibility', async (req, res) => {
+  try {
+    const currentUserId = (req.session as any)?.userId;
+    if (!currentUserId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Get all friendships for the current user
+    const friendships = await prisma.friendship.findMany({
+      where: {
+        OR: [
+          { userAId: currentUserId },
+          { userBId: currentUserId }
+        ]
+      },
+      include: {
+        userA: { select: { id: true, username: true } },
+        userB: { select: { id: true, username: true } }
+      }
+    });
+
+    const results = [];
+
+    for (const friendship of friendships) {
+      const friendId = friendship.userAId === currentUserId ? friendship.userBId : friendship.userAId;
+      const friendUsername = friendship.userAId === currentUserId ? friendship.userB.username : friendship.userA.username;
+      
+      const score = await calculateCompatibility(currentUserId, friendId);
+      
+      if (score !== null) {
+        // Ensure userAId < userBId for consistent storage
+        const [userAId, userBId] = currentUserId < friendId ? [currentUserId, friendId] : [friendId, currentUserId];
+        
+        await prisma.compatibility.upsert({
+          where: { userAId_userBId: { userAId, userBId } },
+          create: { userAId, userBId, score },
+          update: { score },
+        });
+        
+        results.push({ friend: friendUsername, score });
+      } else {
+        results.push({ friend: friendUsername, score: 'Not enough mutual ratings (need ≥3)' });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Compatibility scores recalculated',
+      results
+    });
+
+  } catch (error) {
+    console.error('Recalculate compatibility error:', error);
+    res.status(500).json({ error: 'Failed to recalculate compatibility' });
   }
 });
 
@@ -573,16 +698,14 @@ app.get('/api/my/lists', async (req, res) => {
     const userShows = await prisma.userShow.findMany({
       where: { userId },
       include: {
-        show: true,
-        user: {
-          include: {
-            ratings: {
-              where: { userId }
-            }
-          }
-        }
+        show: true
       },
       orderBy: { addedAt: 'desc' }
+    });
+
+    // Get all ratings for this user
+    const userRatings = await prisma.rating.findMany({
+      where: { userId }
     });
 
     const lists = {
@@ -597,7 +720,7 @@ app.get('/api/my/lists', async (req, res) => {
       watched: userShows.filter(us => us.initialStatus === 'Watched').map(us => ({
         ...us.show,
         addedAt: us.addedAt,
-        rating: us.user.ratings.find(r => r.showId === us.showId)?.stars || null
+        rating: userRatings.find(r => r.showId === us.showId)?.stars || null
       }))
     };
 

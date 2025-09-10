@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useFriends } from '../lib/hooks'
 import UserProfile from '../components/UserProfile'
-import { getUserProfile, searchUsers, addFriend } from '../lib/api'
+import { getUserProfile, searchUsers, addFriend, recalculateCompatibility } from '../lib/api'
 import type { User, ShowWithRating, Friend } from '../lib/api'
 
 export default function Friends() {
@@ -69,6 +69,16 @@ export default function Friends() {
     setSearchResults([])
   }
 
+  const handleRecalculateCompatibility = async () => {
+    try {
+      const result = await recalculateCompatibility()
+      console.log('Compatibility recalculated:', result)
+      refetch() // Refresh the friends list
+    } catch (error) {
+      console.error('Failed to recalculate compatibility:', error)
+    }
+  }
+
   const handleUserClick = async (friend: Friend) => {
     setProfileLoading(true)
     const userForModal: User = {
@@ -81,8 +91,8 @@ export default function Friends() {
       const profileData = await getUserProfile(friend.id)
       setProfileShows(profileData.shows)
       setSelectedUser(profileData.user)
-      // Calculate compatibility if needed
-      setCompatibility(Math.floor(Math.random() * 40) + 60) // Placeholder
+      // Use the compatibility from the API response, fallback to friend's compatibility if not available
+      setCompatibility(profileData.compatibility || friend.compatibility || 0)
     } catch (error) {
       console.error('Failed to load profile:', error)
     } finally {
@@ -157,7 +167,13 @@ export default function Friends() {
         {friends && friends.length > 0 ? (
           <div className="space-y-4">
             {/* Find More Friends Button */}
-            <div className="flex justify-end">
+            <div className="flex justify-between items-center">
+              <button
+                onClick={handleRecalculateCompatibility}
+                className="px-3 py-1 text-xs font-medium text-orange-600 bg-orange-50 rounded-md hover:bg-orange-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors"
+              >
+                🔄 Recalculate Compatibility
+              </button>
               <button
                 onClick={handleFindFriendsClick}
                 className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"

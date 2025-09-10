@@ -214,6 +214,7 @@ export const getCurrentUserShows = async (): Promise<(ShowWithRating & { status:
 export interface UserProfileData {
   user: User;
   shows: ShowWithRating[];
+  compatibility?: number | null;
   mostCompatibleFriend?: {
     friend: Friend;
     compatibility: number;
@@ -269,6 +270,23 @@ export const addFriend = async (friendId: string): Promise<{ success: boolean; m
 
   if (!response.ok) {
     throw new Error('Failed to add friend');
+  }
+
+  return response.json();
+};
+
+// Debug function to recalculate compatibility scores
+export const recalculateCompatibility = async (): Promise<any> => {
+  const response = await fetch(`${API_BASE_URL}/api/debug/recalculate-compatibility`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to recalculate compatibility');
   }
 
   return response.json();
