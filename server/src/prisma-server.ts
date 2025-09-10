@@ -148,6 +148,68 @@ app.get('/api/friends', async (req, res) => {
   }
 });
 
+// Add friend endpoint
+app.post('/api/friends/:friendId', async (req, res) => {
+  try {
+    const currentUserId = (req.session as any)?.userId;
+    if (!currentUserId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { friendId } = req.params;
+
+    if (!friendId) {
+      return res.status(400).json({ error: 'Friend ID is required' });
+    }
+
+    if (currentUserId === friendId) {
+      return res.status(400).json({ error: 'Cannot add yourself as a friend' });
+    }
+
+    // Check if friendship already exists
+    const existingFriendship = await prisma.friendship.findFirst({
+      where: {
+        OR: [
+          { userAId: currentUserId, userBId: friendId },
+          { userAId: friendId, userBId: currentUserId }
+        ]
+      }
+    });
+
+    if (existingFriendship) {
+      return res.status(400).json({ error: 'Already friends with this user' });
+    }
+
+    // Check if the friend user exists
+    const friendUser = await prisma.user.findUnique({
+      where: { id: friendId },
+      select: { id: true, username: true, createdAt: true }
+    });
+
+    if (!friendUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Create the friendship
+    await prisma.friendship.create({
+      data: {
+        userAId: currentUserId,
+        userBId: friendId
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Friend added successfully',
+      friend: friendUser
+    });
+
+  } catch (error) {
+    console.error('Add friend error:', error);
+    res.status(500).json({ error: 'Failed to add friend' });
+  }
+});
+
 // Dashboard endpoint
 app.get('/api/dashboard', async (req, res) => {
   try {
@@ -240,6 +302,79 @@ app.get('/api/dashboard', async (req, res) => {
   } catch (error) {
     console.error('Dashboard error:', error);
     res.status(500).json({ error: 'Failed to get dashboard data' });
+  }
+});
+
+// Search users endpoint
+app.get('/api/users/search', async (req, res) => {
+  try {
+    const currentUserId = (req.session as any)?.userId;
+    if (!currentUserId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { query } = req.query;
+    
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    if (query.length < 2) {
+      return res.status(400).json({ error: 'Search query must be at least 2 characters' });
+    }
+
+    // Get current user's friends to exclude them from results
+    const currentUserFriends = await prisma.friendship.findMany({
+      where: {
+        OR: [
+          { userAId: currentUserId },
+          { userBId: currentUserId }
+        ]
+      },
+      select: {
+        userAId: true,
+        userBId: true
+      }
+    });
+
+    const friendIds = currentUserFriends.flatMap(f => 
+      f.userAId === currentUserId ? [f.userBId] : [f.userAId]
+    );
+
+    // Search for users by username (case-insensitive contains search)
+    // Exclude current user and existing friends
+    const users = await prisma.user.findMany({
+      where: {
+        username: {
+          contains: query
+        },
+        id: {
+          notIn: [currentUserId, ...friendIds]
+        }
+      },
+      select: {
+        id: true,
+        username: true,
+        createdAt: true
+      },
+      take: 20 // Limit results
+    });
+
+    // Sort by first occurrence of search term in username
+    const sortedUsers = users.sort((a, b) => {
+      const aIndex = a.username.toLowerCase().indexOf(query.toLowerCase());
+      const bIndex = b.username.toLowerCase().indexOf(query.toLowerCase());
+      return aIndex - bIndex;
+    });
+
+    res.json({
+      success: true,
+      users: sortedUsers
+    });
+
+  } catch (error) {
+    console.error('Search users error:', error);
+    res.status(500).json({ error: 'Failed to search users' });
   }
 });
 

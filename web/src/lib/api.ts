@@ -242,3 +242,33 @@ export const healthCheck = async (): Promise<{ status: string; message: string }
   
   return response.json();
 };
+
+// Search users
+export const searchUsers = async (query: string): Promise<{ success: boolean; users: User[] }> => {
+  const response = await fetch(`${API_BASE_URL}/api/users/search?query=${encodeURIComponent(query)}`, {
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to search users');
+  }
+
+  return response.json();
+};
+
+// Add friend
+export const addFriend = async (friendId: string): Promise<{ success: boolean; message: string; friend: User }> => {
+  const response = await fetch(`${API_BASE_URL}/api/friends/${friendId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to add friend');
+  }
+
+  return response.json();
+};
