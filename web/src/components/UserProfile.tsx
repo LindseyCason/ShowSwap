@@ -51,14 +51,6 @@ export default function UserProfile({
     }
   };
 
-  // Debug logging - can be removed once everything is working
-  // console.log('UserProfile Debug Info:');
-  // console.log('- User:', user);
-  // console.log('- User shows:', userShows);
-  // console.log('- Number of user shows:', userShows?.length);
-  // console.log('- My shows:', currentUserShows);
-  // console.log('- Number of my shows:', currentUserShows?.length);
-
   // Load current user's shows to check which ones are already added
   useEffect(() => {
     const loadCurrentUserShows = async () => {
@@ -93,14 +85,11 @@ export default function UserProfile({
     }
   }
 
-  const handleAddToWatch = async (showId: string, showTitle: string) => {
-    console.log('Adding show to watch:', showId, showTitle)
+  const handleAddToWatch = async (showId: string) => {
     setLoadingStates(prev => ({ ...prev, [showId]: true }))
     
     try {
-      console.log('Calling addShowToWatch API...')
       const result = await addShowToWatch(showId)
-      console.log('API result:', result)
       
       // Update local state
       setCurrentUserShows(prev => [...prev, { ...result.show as ShowWithRating, status: result.status }])
@@ -364,7 +353,7 @@ export default function UserProfile({
                           </span>
                         ) : (
                           <button
-                            onClick={() => handleAddToWatch(show.id, show.title)}
+                            onClick={() => handleAddToWatch(show.id)}
                             disabled={loadingStates[show.id]}
                             className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           >
