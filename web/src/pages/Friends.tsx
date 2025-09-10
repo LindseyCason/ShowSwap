@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useFriends } from '../lib/hooks'
 import UserProfile from '../components/UserProfile'
-import { getUserProfile } from '../lib/api'
+import { getUserProfile, searchUsers, addFriend, recalculateCompatibility } from '../lib/api'
 import type { User, ShowWithRating, Friend } from '../lib/api'
 
 export default function Friends() {
@@ -13,8 +13,70 @@ export default function Friends() {
   const [profileLoading, setProfileLoading] = useState(false)
   const [compatibility, setCompatibility] = useState<number | undefined>(undefined)
 
+  // Search state
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<User[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [addingFriend, setAddingFriend] = useState<string | null>(null)
+
   const refetch = () => {
     window.location.reload() // Simple refetch for now
+  }
+
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query)
+    
+    if (query.length < 2) {
+      setSearchResults([])
+      return
+    }
+
+    setSearchLoading(true)
+    try {
+      const result = await searchUsers(query)
+      setSearchResults(result.users)
+    } catch (error) {
+      console.error('Search failed:', error)
+      setSearchResults([])
+    } finally {
+      setSearchLoading(false)
+    }
+  }
+
+  const handleAddFriend = async (userId: string) => {
+    setAddingFriend(userId)
+    try {
+      await addFriend(userId)
+      // Remove the user from search results since they're now a friend
+      setSearchResults(prev => prev.filter(user => user.id !== userId))
+      // Refetch friends list
+      refetch()
+    } catch (error) {
+      console.error('Failed to add friend:', error)
+    } finally {
+      setAddingFriend(null)
+    }
+  }
+
+  const handleFindFriendsClick = () => {
+    setIsSearching(true)
+  }
+
+  const handleCancelSearch = () => {
+    setIsSearching(false)
+    setSearchQuery('')
+    setSearchResults([])
+  }
+
+  const handleRecalculateCompatibility = async () => {
+    try {
+      const result = await recalculateCompatibility()
+      console.log('Compatibility recalculated:', result)
+      refetch() // Refresh the friends list
+    } catch (error) {
+      console.error('Failed to recalculate compatibility:', error)
+    }
   }
 
   const handleUserClick = async (friend: Friend) => {
@@ -29,8 +91,8 @@ export default function Friends() {
       const profileData = await getUserProfile(friend.id)
       setProfileShows(profileData.shows)
       setSelectedUser(profileData.user)
-      // Calculate compatibility if needed
-      setCompatibility(Math.floor(Math.random() * 40) + 60) // Placeholder
+      // Use the compatibility from the API response, fallback to friend's compatibility if not available
+      setCompatibility(profileData.compatibility || friend.compatibility || 0)
     } catch (error) {
       console.error('Failed to load profile:', error)
     } finally {
@@ -104,6 +166,22 @@ export default function Friends() {
 
         {friends && friends.length > 0 ? (
           <div className="space-y-4">
+            {/* Find More Friends Button */}
+            <div className="flex justify-between items-center">
+              <button
+                onClick={handleRecalculateCompatibility}
+                className="px-3 py-1 text-xs font-medium text-orange-600 bg-orange-50 rounded-md hover:bg-orange-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors"
+              >
+                🔄 Recalculate Compatibility
+              </button>
+              <button
+                onClick={handleFindFriendsClick}
+                className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+              >
+                + Find More Friends
+              </button>
+            </div>
+            
             {friends.map((friend) => (
               <div 
                 key={friend.id} 
@@ -120,7 +198,7 @@ export default function Friends() {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900">{friend.username}</h3>
-                        <p className="text-sm text-gray-500">ShowSwap Friend</p>
+                        <p className="text-sm text-green-600 font-medium">{friend.compatibility}% compatibility</p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-3">
@@ -145,12 +223,96 @@ export default function Friends() {
             <p className="text-gray-600 mb-6">
               You haven't connected with any friends on ShowSwap yet. Start by adding some friends to see what they're watching!
             </p>
-            <button className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors">
+            <button 
+              onClick={handleFindFriendsClick}
+              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+            >
               Find Friends
             </button>
           </div>
         )}
       </div>
+
+      {/* Search Friends Modal */}
+      {isSearching && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-96 flex flex-col">
+            <div className="p-6 border-b">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Find Friends</h3>
+                <button
+                  onClick={handleCancelSearch}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search by username..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  autoFocus
+                />
+                {searchLoading && (
+                  <div className="absolute right-3 top-2.5">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                  </div>
+                )}
+              </div>
+              {searchQuery.length > 0 && searchQuery.length < 2 && (
+                <p className="text-sm text-gray-500 mt-2">Type at least 2 characters to search</p>
+              )}
+            </div>
+            
+            <div className="flex-1 overflow-y-auto">
+              {searchResults.length > 0 ? (
+                <div className="p-4 space-y-3">
+                  {searchResults.map((user) => (
+                    <div key={user.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-medium text-blue-600">
+                            {user.username.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">{user.username}</span>
+                      </div>
+                      <button
+                        onClick={() => handleAddFriend(user.id)}
+                        disabled={addingFriend === user.id}
+                        className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {addingFriend === user.id ? 'Adding...' : 'Add Friend'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : searchQuery.length >= 2 && !searchLoading ? (
+                <div className="p-6 text-center text-gray-500">
+                  <p>No users found matching "{searchQuery}"</p>
+                </div>
+              ) : searchQuery.length >= 2 && searchLoading ? (
+                <div className="p-6 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="mt-2 text-sm text-gray-600">Searching...</p>
+                </div>
+              ) : (
+                <div className="p-6 text-center text-gray-500">
+                  <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <p>Start typing to search for users</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* User Profile Modal */}
       <UserProfile
