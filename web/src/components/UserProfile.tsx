@@ -168,73 +168,112 @@ export default function UserProfile({
             </button>
           </div>
           
-          {compatibility !== undefined && compatibility !== null ? (
-            compatibility > 0 ? (
-              <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                <h4 className="text-sm font-medium text-green-800 mb-2">Compatibility Score</h4>
-                <div className="flex items-center justify-between">
-                  <span className="text-lg font-bold text-green-600">{compatibility}%</span>
-                  <p className="text-xs text-green-600">
-                    Based on shared shows and similar ratings
-                  </p>
+          <div className="mt-4 flex space-x-4">
+            {/* Compatibility Score - Left Side */}
+            {compatibility !== undefined && compatibility !== null ? (
+              compatibility > 0 ? (
+                <div className="flex-1 p-4 bg-green-50 rounded-lg border border-green-200">
+                  <h4 className="text-sm font-medium text-green-800 mb-2">Compatibility Score</h4>
+                  <div className="flex items-center justify-center">
+                    <div className="relative w-20 h-20">
+                      <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 100 100">
+                        {/* Background circle */}
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          stroke="rgb(220 252 231)"
+                          strokeWidth="8"
+                          fill="transparent"
+                        />
+                        {/* Progress circle */}
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          stroke="rgb(34 197 94)"
+                          strokeWidth="8"
+                          fill="transparent"
+                          strokeDasharray={`${2 * Math.PI * 40}`}
+                          strokeDashoffset={`${2 * Math.PI * 40 * (1 - compatibility / 100)}`}
+                          strokeLinecap="round"
+                          className="transition-all duration-300 ease-in-out"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-lg font-bold text-green-600">{compatibility}%</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+              ) : (
+                <div className="flex-1 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <h4 className="text-sm font-medium text-gray-800 mb-2">Compatibility Score</h4>
+                  <div className="flex items-center justify-center">
+                    <div className="relative w-20 h-20">
+                      <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 100 100">
+                        {/* Background circle */}
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          stroke="rgb(229 231 235)"
+                          strokeWidth="8"
+                          fill="transparent"
+                        />
+                        {/* No progress circle for 0% */}
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-lg font-bold text-gray-600">0%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            ) : null}
+
+            {/* Friend Suggestions - Right Side */}
+            {mostCompatibleFriend ? (
+              <div className="flex-1 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h4 className="text-sm font-medium text-blue-800 mb-2">Suggested Friend</h4>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                      <span className="text-sm font-bold text-blue-600">
+                        {mostCompatibleFriend.friend.username.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="font-medium text-blue-900">{mostCompatibleFriend.friend.username}</p>
+                      <p className="text-xs text-blue-600">
+                        {mostCompatibleFriend.compatibility}% compatible with {user.username}
+                      </p>
+                    </div>
+                  </div>
+                  {onViewProfile && (
+                    <button
+                      onClick={() => onViewProfile(mostCompatibleFriend.friend.id)}
+                      className="text-xs bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors"
+                    >
+                      View Profile
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-blue-600 mt-2">
+                  Most similar viewing preferences - consider following for great recommendations!
+                </p>
               </div>
             ) : (
-              <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <h4 className="text-sm font-medium text-gray-800 mb-2">Compatibility Score</h4>
-                <div className="flex items-center justify-between">
-                  <span className="text-lg font-bold text-gray-600">0%</span>
-                  <p className="text-xs text-gray-600">
-                    Rate at least 3 shows in common to see compatibility
+              <div className="flex-1 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <h4 className="text-sm font-medium text-gray-600 mb-2">Friend Suggestions</h4>
+                <div className="text-center py-2">
+                  <p className="text-sm text-gray-500">
+                    Check back later for suggestions
                   </p>
                 </div>
               </div>
-            )
-          ) : null}
-
-          {mostCompatibleFriend ? (
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h4 className="text-sm font-medium text-blue-800 mb-2">Suggested Friend</h4>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-bold text-blue-600">
-                      {mostCompatibleFriend.friend.username.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="font-medium text-blue-900">{mostCompatibleFriend.friend.username}</p>
-                    <p className="text-xs text-blue-600">
-                      {mostCompatibleFriend.compatibility}% compatible with {user.username}
-                    </p>
-                  </div>
-                </div>
-                {onViewProfile && (
-                  <button
-                    onClick={() => onViewProfile(mostCompatibleFriend.friend.id)}
-                    className="text-xs bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors"
-                  >
-                    View Profile
-                  </button>
-                )}
-              </div>
-              <p className="text-xs text-blue-600 mt-2">
-                Most similar viewing preferences - consider following for great recommendations!
-              </p>
-            </div>
-          ) : (
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <h4 className="text-sm font-medium text-gray-600 mb-2">Friend Suggestions</h4>
-              <div className="text-center py-2">
-                <p className="text-sm text-gray-500">
-                  Check back later to see who {user.username} is compatible with!
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  More suggestions will appear as the network grows
-                </p>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Content */}
