@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getUserLists, updateShowStatus } from '../lib/api';
+import { getUserLists, updateShowStatus, deleteShow } from '../lib/api';
 import type { ShowWithRating } from '../lib/api';
 import RatingModal from '../components/RatingModal';
 
@@ -56,10 +56,11 @@ const EmptyState = ({ tab, onAddShow }: { tab: TabType; onAddShow: () => void })
   );
 };
 
-const ShowCard = ({ show, currentTab, onStatusChange }: { 
+const ShowCard = ({ show, currentTab, onStatusChange, onDelete }: { 
   show: ShowWithRating; 
   currentTab: TabType;
   onStatusChange: (showId: string, newStatus: string, rating?: number) => void;
+  onDelete: (showId: string, showTitle: string) => void;
 }) => {
   const getStatusButtons = () => {
     switch (currentTab) {
@@ -139,8 +140,19 @@ const ShowCard = ({ show, currentTab, onStatusChange }: {
           </p>
 
           {/* Status Action Buttons */}
-          <div className="flex items-center">
-            {getStatusButtons()}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              {getStatusButtons()}
+            </div>
+            
+            {/* Delete Button */}
+            <button
+              onClick={() => onDelete(show.id, show.title)}
+              className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+              title="Remove from list"
+            >
+              🗑️
+            </button>
           </div>
         </div>
       </div>
@@ -148,11 +160,12 @@ const ShowCard = ({ show, currentTab, onStatusChange }: {
   );
 };
 
-const ShowGrid = ({ shows, tab, onAddShow, onStatusChange }: { 
+const ShowGrid = ({ shows, tab, onAddShow, onStatusChange, onDelete }: { 
   shows: ShowWithRating[]; 
   tab: TabType; 
   onAddShow: () => void;
   onStatusChange: (showId: string, newStatus: string, rating?: number) => void;
+  onDelete: (showId: string, showTitle: string) => void;
 }) => {
   if (shows.length === 0) {
     return <EmptyState tab={tab} onAddShow={onAddShow} />;
@@ -166,6 +179,7 @@ const ShowGrid = ({ shows, tab, onAddShow, onStatusChange }: {
           show={show} 
           currentTab={tab}
           onStatusChange={onStatusChange}
+          onDelete={onDelete}
         />
       ))}
     </div>
@@ -177,6 +191,15 @@ export default function Lists() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>('watching');
   const [ratingModal, setRatingModal] = useState<{
+    isOpen: boolean;
+    showId: string;
+    showTitle: string;
+  }>({
+    isOpen: false,
+    showId: '',
+    showTitle: ''
+  });
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
     isOpen: boolean;
     showId: string;
     showTitle: string;
@@ -251,6 +274,32 @@ export default function Lists() {
 
   const handleRatingModalClose = () => {
     setRatingModal({ isOpen: false, showId: '', showTitle: '' });
+  };
+
+  const handleDelete = (showId: string, showTitle: string) => {
+    setDeleteConfirmation({
+      isOpen: true,
+      showId,
+      showTitle
+    });
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      setIsUpdating(true);
+      await deleteShow(deleteConfirmation.showId);
+      queryClient.invalidateQueries({ queryKey: ['userLists'] });
+      setDeleteConfirmation({ isOpen: false, showId: '', showTitle: '' });
+    } catch (error) {
+      console.error('Failed to delete show:', error);
+      // You could add a toast notification here
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirmation({ isOpen: false, showId: '', showTitle: '' });
   };
 
   if (loading) {
@@ -382,6 +431,7 @@ export default function Lists() {
               tab={activeTab} 
               onAddShow={handleAddShow}
               onStatusChange={handleStatusChange}
+              onDelete={handleDelete}
             />
           </div>
         </div>
@@ -394,6 +444,37 @@ export default function Lists() {
         onSubmit={handleRatingSubmit}
         showTitle={ratingModal.showTitle}
       />
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmation.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Remove Show from List
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to remove "{deleteConfirmation.showTitle}" from your list? 
+              This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={handleDeleteCancel}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                disabled={isUpdating}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+                disabled={isUpdating}
+              >
+                {isUpdating ? 'Removing...' : 'Remove Show'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Loading Overlay */}
       {isUpdating && (
