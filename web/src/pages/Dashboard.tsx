@@ -35,6 +35,24 @@ const PaginatedTile = <T,>({ title, data, onItemClick, renderItem, emptyMessage 
   const isLastPage = currentPage === totalPages - 1;
   const isOnlyOnePage = totalPages <= 1;
 
+  // Helper function to get unique key from item
+  const getItemKey = (item: T): string => {
+    // Type guard for ShowWithRating
+    if (item && typeof item === 'object' && 'id' in item && typeof (item as any).id === 'string') {
+      return (item as any).id;
+    }
+    // Type guard for CompatibleFriend
+    if (item && typeof item === 'object' && 'friend' in item) {
+      const friendItem = item as any;
+      if (friendItem.friend && typeof friendItem.friend === 'object' && 
+          'id' in friendItem.friend && typeof friendItem.friend.id === 'string') {
+        return `friend-${friendItem.friend.id}`;
+      }
+    }
+    // Fallback to stringified item (not ideal but better than index)
+    return JSON.stringify(item);
+  };
+
   const handlePrevious = () => {
     if (!isFirstPage) {
       setCurrentPage(currentPage - 1);
@@ -90,9 +108,9 @@ const PaginatedTile = <T,>({ title, data, onItemClick, renderItem, emptyMessage 
         <p className="text-gray-500 text-sm">{emptyMessage}</p>
       ) : (
         <div className="space-y-3">
-          {currentItems.map((item, index) => (
+          {currentItems.map((item) => (
             <div
-              key={`${currentPage}-${index}`}
+              key={getItemKey(item)}
               onClick={() => onItemClick?.(item)}
               className={onItemClick ? "cursor-pointer" : ""}
             >
