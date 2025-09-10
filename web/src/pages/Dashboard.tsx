@@ -185,6 +185,20 @@ export default function Dashboard() {
     setMostCompatibleFriend(null);
   };
 
+  const handleWatchNow = async (showId: string) => {
+    try {
+      setIsUpdating(true);
+      await updateShowStatus(showId, 'WatchingNow');
+      
+      // Refetch dashboard data to update the UI
+      await refetchDashboard();
+    } catch (error) {
+      console.error('Failed to update show status to watching:', error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const handleRatingSubmit = async (rating: number) => {
     try {
       setIsUpdating(true);
@@ -311,11 +325,14 @@ export default function Dashboard() {
                   <p className="text-sm text-gray-500">{show.platform}</p>
                 </div>
                 <button
-                  onClick={() => setRatingModal({
-                    isOpen: true,
-                    showId: show.id,
-                    showTitle: show.title
-                  })}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setRatingModal({
+                      isOpen: true,
+                      showId: show.id,
+                      showTitle: show.title
+                    });
+                  }}
                   className="ml-3 px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                 >
                   Finished
@@ -330,11 +347,20 @@ export default function Dashboard() {
             data={dashboardData?.toWatch || []}
             emptyMessage="No shows in your watch list"
             renderItem={(show: ShowWithRating) => (
-              <div className="flex items-start">
+              <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{show.title}</p>
                   <p className="text-sm text-gray-500">{show.platform}</p>
                 </div>
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleWatchNow(show.id);
+                  }}
+                  className="ml-3 px-2 py-1 text-xs font-medium text-green-600 bg-green-50 rounded-md hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+                >
+                  Start
+                </button>
               </div>
             )}
           />
