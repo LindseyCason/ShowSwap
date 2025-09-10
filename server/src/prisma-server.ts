@@ -627,34 +627,42 @@ app.get('/api/users/search', async (req, res) => {
       return res.status(400).json({ error: 'Search query must be at least 2 characters' });
     }
 
-    // Get current user's friends to exclude them from results
-    const currentUserFriends = await prisma.friendship.findMany({
+    // Get users that the current user is already following to exclude them from results
+    const currentUserFollowing = await prisma.follow.findMany({
       where: {
-        OR: [
-          { userAId: currentUserId },
-          { userBId: currentUserId }
-        ]
+        followerId: currentUserId
       },
       select: {
-        userAId: true,
-        userBId: true
+        followingId: true
       }
     });
 
-    const friendIds = currentUserFriends.flatMap(f => 
-      f.userAId === currentUserId ? [f.userBId] : [f.userAId]
-    );
+    const followingIds = currentUserFollowing.map(f => f.followingId);
+    
+    // Always exclude current user, plus anyone they're following
+    const excludeIds = [currentUserId, ...followingIds];
 
     // Search for users by username (case-insensitive contains search)
-    // Exclude current user and existing friends
+    // Exclude current user and users already being followed
     const users = await prisma.user.findMany({
       where: {
-        username: {
-          contains: query
-        },
-        id: {
-          notIn: [currentUserId, ...friendIds]
-        }
+        AND: [
+          {
+            username: {
+              contains: query
+            }
+          },
+          {
+            id: {
+              notIn: excludeIds
+            }
+          },
+          {
+            id: {
+              not: currentUserId // Extra safety check to exclude current user
+            }
+          }
+        ]
       },
       select: {
         id: true,
