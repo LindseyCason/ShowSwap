@@ -8,7 +8,7 @@ import RatingModal from '../components/RatingModal';
 type TabType = 'watching' | 'watched' | 'toWatch';
 
 const TABS = [
-  { id: 'watching' as TabType, label: 'Watching Now', icon: '📺' },
+  { id: 'watching' as TabType, label: 'Watching', icon: '📺' },
   { id: 'watched' as TabType, label: 'Watched', icon: '✅' },
   { id: 'toWatch' as TabType, label: 'To Watch', icon: '📋' },
 ];
@@ -353,11 +353,6 @@ export default function Lists() {
     return userLists[tab] || [];
   };
 
-  const getTotalShows = () => {
-    if (!userLists) return 0;
-    return Object.values(userLists).reduce((total, shows) => total + shows.length, 0);
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto py-8 px-4">
@@ -366,9 +361,6 @@ export default function Lists() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">My Lists</h1>
-              <p className="text-gray-600">
-                Manage your show collections • {getTotalShows()} total shows
-              </p>
             </div>
             <div className="flex space-x-3">
               <button
@@ -390,7 +382,7 @@ export default function Lists() {
         {/* Tabs */}
         <div className="bg-white rounded-lg shadow">
           <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8 px-6">
+            <nav className="-mb-px flex justify-between px-6">
               {TABS.map((tab) => {
                 const showCount = getShowsForTab(tab.id).length;
                 const isActive = activeTab === tab.id;
@@ -399,17 +391,17 @@ export default function Lists() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    className={`flex-1 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                       isActive
                         ? 'border-indigo-500 text-indigo-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                   >
-                    <span className="flex items-center space-x-2">
-                      <span>{tab.icon}</span>
-                      <span>{tab.label}</span>
+                    <span className="flex flex-col items-center space-y-1 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-2">
+                      <span className="text-lg sm:text-base">{tab.icon}</span>
+                      <span className="text-xs sm:text-sm">{tab.label}</span>
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        className={`inline-flex items-center px-2 py-0.5 sm:px-2.5 rounded-full text-xs font-medium ${
                           isActive
                             ? 'bg-indigo-100 text-indigo-800'
                             : 'bg-gray-100 text-gray-600'
