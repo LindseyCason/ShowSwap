@@ -146,17 +146,29 @@ export default function UserProfile({
             </button>
           </div>
           
-          {compatibility && (
-            <div className="mt-4 p-3 bg-green-50 rounded-lg">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-green-800">Compatibility Score</span>
-                <span className="text-lg font-bold text-green-600">{compatibility}%</span>
+          {compatibility !== undefined && compatibility !== null ? (
+            compatibility > 0 ? (
+              <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                <h4 className="text-sm font-medium text-green-800 mb-2">Compatibility Score</h4>
+                <div className="flex items-center justify-between">
+                  <span className="text-lg font-bold text-green-600">{compatibility}%</span>
+                  <p className="text-xs text-green-600">
+                    Based on shared shows and similar ratings
+                  </p>
+                </div>
               </div>
-              <p className="text-xs text-green-600 mt-1">
-                Based on shared shows and similar ratings
-              </p>
-            </div>
-          )}
+            ) : (
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <h4 className="text-sm font-medium text-gray-800 mb-2">Compatibility Score</h4>
+                <div className="flex items-center justify-between">
+                  <span className="text-lg font-bold text-gray-600">0%</span>
+                  <p className="text-xs text-gray-600">
+                    Rate at least 3 shows in common to see compatibility
+                  </p>
+                </div>
+              </div>
+            )
+          ) : null}
 
           {mostCompatibleFriend ? (
             <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
