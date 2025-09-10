@@ -1,11 +1,13 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../lib/UserContext'
 
 export default function Login() {
   const [username, setUsername] = useState('')
   const [loading, setLoading] = useState(false)
   const [apiTest, setApiTest] = useState('')
   const navigate = useNavigate()
+  const { refreshUser } = useAuth()
 
   const testAPI = async () => {
     try {
@@ -23,6 +25,10 @@ export default function Login() {
       alert('Username must be at least 3 characters long')
       return
     }
+    if (username.trim().length > 30) {
+      alert('Username must be no more than 30 characters long')
+      return
+    }
 
     setLoading(true)
     try {
@@ -36,6 +42,7 @@ export default function Login() {
       })
 
       if (response.ok) {
+        await refreshUser() // Refresh user data after successful login
         navigate('/')
       } else {
         alert('Login failed')
@@ -65,10 +72,11 @@ export default function Login() {
               type="text"
               required
               minLength={3}
+              maxLength={30}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-              placeholder="Enter your username (min 3 characters)"
+              placeholder="Enter your username (3-30 characters)"
             />
           </div>
           <button

@@ -1,17 +1,18 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useCurrentUser } from '../lib/hooks'
+import { useAuth } from '../lib/UserContext'
 import { logout } from '../lib/api'
 
 export default function Navigation() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user } = useCurrentUser()
+  const { user, clearUser } = useAuth()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const handleLogout = async () => {
     try {
       await logout()
+      clearUser() // Clear user state immediately
       navigate('/login')
     } catch (error) {
       console.error('Logout failed:', error)

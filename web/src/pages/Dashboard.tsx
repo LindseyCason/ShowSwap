@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
-import { useDashboard, useCurrentUser } from '../lib/hooks'
+import { useDashboard } from '../lib/hooks'
+import { useAuth } from '../lib/UserContext'
 import UserProfile from '../components/UserProfile'
 import RatingModal from '../components/RatingModal'
 import { useState } from 'react'
@@ -125,7 +126,7 @@ const PaginatedTile = <T,>({ title, data, onItemClick, renderItem, emptyMessage 
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { user, loading: userLoading, error: userError } = useCurrentUser();
+  const { user, loading: userLoading, error: userError } = useAuth();
   
   // Only fetch dashboard data if we have a user
   const shouldFetchDashboard = Boolean(!userLoading && !userError && user);
