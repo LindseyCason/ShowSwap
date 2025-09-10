@@ -228,29 +228,44 @@ export default function UserProfile({
                     <div className="flex-1">
                       <h4 className="font-medium text-gray-900">{show.title}</h4>
                       <p className="text-sm text-gray-600">{show.platform}</p>
-                      {show.rating && (
-                        <p className="text-sm text-yellow-600 mt-1">
-                          {'★'.repeat(show.rating)} ({show.rating}/5)
-                        </p>
-                      )}
                       <p className="text-xs text-gray-500 mt-1">
                         Added {new Date(show.addedAt).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="ml-4 flex flex-col items-end space-y-2">
+                      {/* Ratings Section */}
+                      <div className="text-right space-y-1">
+                        {/* Friend's Rating */}
+                        {show.rating && (
+                          <div className="text-xs">
+                            <span className="text-gray-500">Friend's rating:</span>
+                            <div className="text-yellow-600 font-medium">
+                              {'★'.repeat(show.rating)} ({show.rating}/5)
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Your Rating */}
+                        {(() => {
+                          const myShow = getShowInMyList(show.id);
+                          return myShow?.rating && (
+                            <div className="text-xs">
+                              <span className="text-gray-500">Your rating:</span>
+                              <div className="text-yellow-600 font-medium">
+                                {'★'.repeat(myShow.rating)} ({myShow.rating}/5)
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      
+                      {/* Action Button or Status */}
                       {(() => {
                         const myShow = getShowInMyList(show.id);
                         return myShow ? (
-                          <div className="text-right">
-                            <span className="text-xs text-green-600 font-medium">
-                              ✓ {getStatusDisplayName(myShow.status)}
-                            </span>
-                            {myShow.rating && (
-                              <div className="text-xs text-yellow-600 mt-1">
-                                Your rating: {'★'.repeat(myShow.rating)}
-                              </div>
-                            )}
-                          </div>
+                          <span className="text-xs text-green-600 font-medium">
+                            ✓ {getStatusDisplayName(myShow.status)}
+                          </span>
                         ) : (
                           <button
                             onClick={() => handleAddToWatch(show.id, show.title)}
