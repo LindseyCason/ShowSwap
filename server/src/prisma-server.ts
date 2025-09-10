@@ -628,6 +628,62 @@ app.post('/api/shows/:showId/add-to-watch', async (req, res) => {
   }
 });
 
+// Delete show from user's list
+app.delete('/api/shows/:showId', async (req, res) => {
+  console.log('🗑️ Delete show endpoint called for showId:', req.params.showId);
+  
+  try {
+    const userId = (req.session as any)?.userId;
+    console.log('Current user ID:', userId);
+    
+    if (!userId) {
+      console.log('❌ User not authenticated');
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { showId } = req.params;
+
+    // Check if user has this show
+    const existingUserShow = await prisma.userShow.findUnique({
+      where: { 
+        userId_showId: { userId, showId }
+      }
+    });
+
+    console.log('Existing user show:', existingUserShow);
+
+    if (!existingUserShow) {
+      console.log('❌ Show not found in user list');
+      return res.status(404).json({ error: 'Show not found in your list' });
+    }
+
+    // Delete any rating for this show
+    await prisma.rating.deleteMany({
+      where: { 
+        userId, 
+        showId 
+      }
+    });
+
+    // Delete the user show
+    await prisma.userShow.delete({
+      where: { 
+        userId_showId: { userId, showId }
+      }
+    });
+
+    console.log('✅ Successfully deleted show from user list');
+
+    res.json({ 
+      success: true,
+      message: 'Show removed from your list'
+    });
+  } catch (error) {
+    console.error('❌ Delete show error:', error);
+    res.status(500).json({ error: 'Failed to remove show from list' });
+  }
+});
+
 // Action endpoints
 app.post('/api/action/watching-now', async (req, res) => {
   try {
