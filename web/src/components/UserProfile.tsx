@@ -2,6 +2,12 @@ import { useState, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { User, ShowWithRating, Friend } from '../lib/api'
 import { addShowToWatch, getCurrentUserShows } from '../lib/api'
+import { bucketCompatibility } from '../lib/compatibility-buckets'
+
+// Helper function to capitalize username
+const capitalizeUsername = (username: string): string => {
+  return username.charAt(0).toUpperCase() + username.slice(1).toLowerCase();
+};
 
 interface UserProfileProps {
   user: User | null
@@ -180,7 +186,7 @@ export default function UserProfile({
                 </span>
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-900">{user.username}</h2>
+                <h2 className="text-xl font-bold text-gray-900">{capitalizeUsername(user.username)}</h2>
                 <p className="text-sm text-gray-500">
                   Joined {new Date(user.createdAt).toLocaleDateString()}
                 </p>
@@ -220,40 +226,51 @@ export default function UserProfile({
             {/* Binge Bond - Left Side */}
             {compatibility !== undefined && compatibility !== null ? (
               compatibility > 0 ? (
-                <div className="flex-1 p-4 bg-green-50 rounded-lg border border-green-200">
-                  <h4 className="text-sm font-medium text-green-800 mb-2">Binge Bond</h4>
-                  <div className="flex items-center justify-center">
-                    <div className="relative w-20 h-20">
-                      <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 100 100">
-                        {/* Background circle */}
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="40"
-                          stroke="rgb(220 252 231)"
-                          strokeWidth="8"
-                          fill="transparent"
-                        />
-                        {/* Progress circle */}
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="40"
-                          stroke="rgb(34 197 94)"
-                          strokeWidth="8"
-                          fill="transparent"
-                          strokeDasharray={`${2 * Math.PI * 40}`}
-                          strokeDashoffset={`${2 * Math.PI * 40 * (1 - compatibility / 100)}`}
-                          strokeLinecap="round"
-                          className="transition-all duration-300 ease-in-out"
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-lg font-bold text-green-600">{compatibility}%</span>
+                (() => {
+                  const bucket = bucketCompatibility(compatibility);
+                  return (
+                    <div className="flex-1 p-4 rounded-lg border" style={{ 
+                      backgroundColor: bucket.bgColor, 
+                      borderColor: bucket.borderColor 
+                    }}>
+                      <h4 className="text-sm font-medium mb-2" style={{ color: bucket.color }}>Binge Bond</h4>
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <div className="relative w-20 h-20">
+                          <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 100 100">
+                            {/* Background circle */}
+                            <circle
+                              cx="50"
+                              cy="50"
+                              r="40"
+                              stroke={bucket.borderColor}
+                              strokeWidth="8"
+                              fill="transparent"
+                            />
+                            {/* Progress circle */}
+                            <circle
+                              cx="50"
+                              cy="50"
+                              r="40"
+                              stroke={bucket.color}
+                              strokeWidth="8"
+                              fill="transparent"
+                              strokeDasharray={`${2 * Math.PI * 40}`}
+                              strokeDashoffset={`${2 * Math.PI * 40 * (1 - compatibility / 100)}`}
+                              strokeLinecap="round"
+                              className="transition-all duration-300 ease-in-out"
+                            />
+                          </svg>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-lg font-bold" style={{ color: bucket.color }}>{compatibility}%</span>
+                          </div>
+                        </div>
+                        <span className="text-sm font-medium text-center" style={{ color: bucket.color }}>
+                          {bucket.label}
+                        </span>
                       </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()
               ) : (
                 <div className="flex-1 p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <h4 className="text-sm font-medium text-blue-800 mb-2">Binge Bond</h4>
@@ -303,39 +320,52 @@ export default function UserProfile({
               <div className="flex-1 p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <h4 className="text-sm font-medium text-blue-800 mb-2">Suggested Friend</h4>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div>
-                      <p className="font-medium text-blue-900">{mostCompatibleFriend.friend.username}</p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col items-start space-y-1">
+                      <p className="font-medium text-blue-900">{capitalizeUsername(mostCompatibleFriend.friend.username)}</p>
+                      {(() => {
+                        const bucket = bucketCompatibility(mostCompatibleFriend.compatibility);
+                        return (
+                          <span className="text-xs font-medium" style={{ color: bucket.color }}>
+                            {bucket.label}
+                          </span>
+                        );
+                      })()}
                     </div>
-                    <div className="relative w-12 h-12">
-                      <svg className="w-12 h-12 transform -rotate-90" viewBox="0 0 100 100">
-                        {/* Background circle */}
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="40"
-                          stroke="rgb(219 234 254)"
-                          strokeWidth="8"
-                          fill="transparent"
-                        />
-                        {/* Progress circle */}
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="40"
-                          stroke="rgb(59 130 246)"
-                          strokeWidth="8"
-                          fill="transparent"
-                          strokeLinecap="round"
-                          strokeDasharray={`${2 * Math.PI * 40}`}
-                          strokeDashoffset={`${2 * Math.PI * 40 * (1 - mostCompatibleFriend.compatibility / 100)}`}
-                          className="transition-all duration-300 ease-in-out"
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-sm font-bold text-blue-600">{mostCompatibleFriend.compatibility}%</span>
-                      </div>
-                    </div>
+                    {(() => {
+                      const bucket = bucketCompatibility(mostCompatibleFriend.compatibility);
+                      return (
+                        <div className="relative w-12 h-12">
+                          <svg className="w-12 h-12 transform -rotate-90" viewBox="0 0 100 100">
+                            {/* Background circle */}
+                            <circle
+                              cx="50"
+                              cy="50"
+                              r="40"
+                              stroke={bucket.borderColor}
+                              strokeWidth="8"
+                              fill="transparent"
+                            />
+                            {/* Progress circle */}
+                            <circle
+                              cx="50"
+                              cy="50"
+                              r="40"
+                              stroke={bucket.color}
+                              strokeWidth="8"
+                              fill="transparent"
+                              strokeLinecap="round"
+                              strokeDasharray={`${2 * Math.PI * 40}`}
+                              strokeDashoffset={`${2 * Math.PI * 40 * (1 - mostCompatibleFriend.compatibility / 100)}`}
+                              className="transition-all duration-300 ease-in-out"
+                            />
+                          </svg>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-xs font-bold" style={{ color: bucket.color }}>{mostCompatibleFriend.compatibility}%</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="flex space-x-2">
                     {onViewProfile && (
@@ -408,7 +438,7 @@ export default function UserProfile({
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">
-                  {user.username}'s Shows ({userShows.length})
+                  {capitalizeUsername(user.username)}'s Shows ({userShows.length})
                 </h3>
                 {!isOnlyOnePage && (
                   <div className="flex items-center space-x-2">
@@ -512,7 +542,7 @@ export default function UserProfile({
             <div className="text-center py-8">
               <p className="text-gray-500">No shows to display</p>
               <p className="text-sm text-gray-400 mt-1">
-                {user.username} hasn't added any shows yet
+                {capitalizeUsername(user.username)} hasn't added any shows yet
               </p>
             </div>
           )}

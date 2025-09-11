@@ -402,3 +402,55 @@ export const testCompatibilityMethods = async (userId: string): Promise<{
 
   return response.json();
 };
+
+// Directional compatibility interfaces
+export interface DirectionalCompatibilityResult {
+  viewerId: string;
+  subjectId: string;
+  overlapCount: number;
+  score?: number;
+  bucket?: { label: string; color: string };
+  reason?: "not_following" | "insufficient_overlap";
+}
+
+// Directional compatibility API functions
+export const getDirectionalCompatibility = async (targetUserId: string): Promise<DirectionalCompatibilityResult> => {
+  const response = await fetch(`${API_BASE_URL}/api/directional-compatibility/${targetUserId}`, {
+    credentials: 'include',
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to get directional compatibility');
+  }
+  
+  return response.json();
+};
+
+export const getBatchDirectionalCompatibility = async (targetUserIds: string[]): Promise<{ results: DirectionalCompatibilityResult[] }> => {
+  const response = await fetch(`${API_BASE_URL}/api/directional-compatibility/batch`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ targetUserIds }),
+    credentials: 'include',
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to get batch directional compatibility');
+  }
+  
+  return response.json();
+};
+
+export const getFollowingDirectionalCompatibility = async (): Promise<{ results: (DirectionalCompatibilityResult & { user: { id: string; username: string } })[] }> => {
+  const response = await fetch(`${API_BASE_URL}/api/directional-compatibility/following`, {
+    credentials: 'include',
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to get following directional compatibility');
+  }
+  
+  return response.json();
+};

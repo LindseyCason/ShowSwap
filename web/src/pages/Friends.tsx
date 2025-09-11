@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useFriends, useFollow, useNewFollowers } from '../lib/hooks'
 import UserProfile from '../components/UserProfile'
+import CompatibilityBadge from '../components/CompatibilityBadge'
 import { getUserProfile, searchUsers, recalculateCompatibility } from '../lib/api'
 import type { User, ShowWithRating, Friend } from '../lib/api'
 
@@ -374,9 +375,13 @@ export default function Friends() {
                           )}
                         </div>
                         {friend.compatibility > 0 && (
-                          <p className="text-sm text-green-600 font-medium">
-                            {friend.compatibility}% binge bond
-                          </p>
+                          <div className="mt-1">
+                            <CompatibilityBadge 
+                              score={friend.compatibility} 
+                              size="sm"
+                              showLabel={false}
+                            />
+                          </div>
                         )}
                       </div>
                     </div>
