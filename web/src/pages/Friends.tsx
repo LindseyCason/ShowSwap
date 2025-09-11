@@ -65,7 +65,7 @@ export default function Friends() {
     if (!selectedUser) return;
     
     try {
-      // Update relationship status immediately
+      // Update relationship status immediately since we just followed
       setSelectedUserRelationship('following')
       
       // Refetch the user's profile to get updated compatibility score

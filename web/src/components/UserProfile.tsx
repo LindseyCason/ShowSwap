@@ -19,6 +19,12 @@ interface UserProfileProps {
   onFollowSuccess?: () => void
 }
 
+// Add local state for suggested friend follow loading and error
+interface SuggestedFriendFollowState {
+  loading: boolean;
+  error: string | null;
+}
+
 export default function UserProfile({ 
   user, 
   isOpen, 
@@ -38,6 +44,9 @@ export default function UserProfile({
   const [followLoading, setFollowLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(0)
+
+  // Suggested friend follow state
+  const [suggestedFriendFollow, setSuggestedFriendFollow] = useState<SuggestedFriendFollowState>({ loading: false, error: null })
 
   // Pagination calculations
   const itemsPerPage = 5;
@@ -338,12 +347,44 @@ export default function UserProfile({
                       </button>
                     )}
                     {onFollow && (
-                      <button
-                        onClick={() => onFollow(mostCompatibleFriend.friend.id)}
-                        className="text-xs bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors"
-                      >
-                        Follow
-                      </button>
+                      <div className="flex flex-col items-end space-y-1">
+                        <button
+                          onClick={async () => {
+                            setSuggestedFriendFollow({ loading: true, error: null });
+                            try {
+                              await onFollow(mostCompatibleFriend.friend.id);
+                              if (onFollowSuccess) onFollowSuccess();
+                            } catch (error) {
+                              setSuggestedFriendFollow({
+                                loading: false,
+                                error: 'Failed to follow user. Please try again.'
+                              });
+                              setTimeout(() => setSuggestedFriendFollow(s => ({ ...s, error: null })), 5000);
+                              return;
+                            }
+                            setSuggestedFriendFollow({ loading: false, error: null });
+                          }}
+                          disabled={suggestedFriendFollow.loading}
+                          className={`text-xs bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors ${
+                            suggestedFriendFollow.loading ? 'opacity-60 cursor-not-allowed' : ''
+                          }`}
+                        >
+                          {suggestedFriendFollow.loading ? (
+                            <div className="flex items-center space-x-1">
+                              <span>Following</span>
+                              <div className="flex space-x-1">
+                                <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                              </div>
+                              <span className="text-xs">🍿</span>
+                            </div>
+                          ) : 'Follow'}
+                        </button>
+                        {suggestedFriendFollow.error && (
+                          <span className="text-xs text-red-600">{suggestedFriendFollow.error}</span>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

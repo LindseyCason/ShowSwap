@@ -3,7 +3,7 @@ import cors from 'cors';
 import session from 'express-session';
 import { PrismaClient } from '@prisma/client';
 import path from 'path';
-import { computeCompatibility, type RatingMap } from './lib/compatibility';
+import { computeCompatibility, type RatingMap, type CompatibilityOptions } from './lib/compatibility';
 import { 
   computeDirectionalCompatibility, 
   PrismaRatingsRepo, 
@@ -885,6 +885,20 @@ app.get('/api/users/:userId/profile', async (req, res) => {
   }
 });
 
+/**
+ * Configuration for compatibility calculation between users.
+ * Adjust these values to tune the compatibility algorithm for ShowSwap.
+ */
+const COMPATIBILITY_CONFIG: CompatibilityOptions = {
+  method: "hybrid" as const,  // Use hybrid method for best of both worlds
+  ratingMin: 1,               // ShowSwap uses 1-5 star ratings
+  ratingMax: 5,
+  minOverlap: 3,              // Need at least 3 shows in common
+  hybridMinOverlap: 10,       // Use correlation when 10+ shows in common
+  hybridWeight: 0.25,         // 25% correlation, 75% weighted similarity
+  decimalPlaces: 0            // Return integer percentage
+};
+
 // Helper function to calculate compatibility between two users using improved algorithm
 async function calculateCompatibility(userAId: string, userBId: string) {
   // Get ratings for both users
@@ -911,16 +925,8 @@ async function calculateCompatibility(userAId: string, userBId: string) {
     ratingsMapB[rating.showId] = rating.stars;
   });
 
-  // Use the improved compatibility calculation with hybrid method
-  const compatibilityScore = computeCompatibility(ratingsMapA, ratingsMapB, {
-    method: "hybrid",           // Use hybrid method for best of both worlds
-    ratingMin: 1,               // ShowSwap uses 1-5 star ratings
-    ratingMax: 5,
-    minOverlap: 3,              // Need at least 3 shows in common
-    hybridMinOverlap: 10,       // Use correlation when 10+ shows in common
-    hybridWeight: 0.25,         // 25% correlation, 75% weighted similarity
-    decimalPlaces: 0            // Return integer percentage
-  });
+  // Use the improved compatibility calculation with configuration constants
+  const compatibilityScore = computeCompatibility(ratingsMapA, ratingsMapB, COMPATIBILITY_CONFIG);
 
   // Return null if below minimum overlap (handled by computeCompatibility)
   return compatibilityScore === 0 ? null : compatibilityScore;
