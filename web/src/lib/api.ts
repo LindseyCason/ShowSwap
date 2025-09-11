@@ -379,3 +379,26 @@ export const recalculateCompatibility = async (): Promise<any> => {
 
   return response.json();
 };
+
+// Test different compatibility calculation methods
+export const testCompatibilityMethods = async (userId: string): Promise<{
+  targetUser: string;
+  mutualShows: number;
+  methods: {
+    weighted: number;
+    correlation: number;
+    hybrid: number;
+    hybridStrict: number;
+  };
+}> => {
+  const response = await fetch(`${API_BASE_URL}/api/debug/test-compatibility/${userId}`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to test compatibility methods');
+  }
+
+  return response.json();
+};

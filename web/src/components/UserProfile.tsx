@@ -127,7 +127,6 @@ export default function UserProfile({
       setLoadingStates(prev => ({ ...prev, [showId]: false }))
     }
   }
-  
   if (!isOpen || !user) return null
 
   return (

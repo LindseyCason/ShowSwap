@@ -3,6 +3,7 @@ import cors from 'cors';
 import session from 'express-session';
 import { PrismaClient } from '@prisma/client';
 import path from 'path';
+import { computeCompatibility, type RatingMap } from './lib/compatibility';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -866,7 +867,7 @@ app.get('/api/users/:userId/profile', async (req, res) => {
   }
 });
 
-// Helper function to calculate compatibility between two users
+// Helper function to calculate compatibility between two users using improved algorithm
 async function calculateCompatibility(userAId: string, userBId: string) {
   // Get ratings for both users
   const [ratingsA, ratingsB] = await Promise.all([
@@ -880,35 +881,31 @@ async function calculateCompatibility(userAId: string, userBId: string) {
     }),
   ]);
 
-  // Find mutual shows (shows both users have rated)
-  const ratingsMapA = new Map(ratingsA.map(r => [r.showId, r.stars]));
-  const mutualRatings: { showId: string; starsA: number; starsB: number }[] = [];
+  // Convert to RatingMap format expected by the compatibility function
+  const ratingsMapA: RatingMap = {};
+  const ratingsMapB: RatingMap = {};
   
-  for (const ratingB of ratingsB) {
-    const starsA = ratingsMapA.get(ratingB.showId);
-    if (typeof starsA === 'number') {
-      mutualRatings.push({ 
-        showId: ratingB.showId, 
-        starsA: starsA, 
-        starsB: ratingB.stars 
-      });
-    }
-  }
+  ratingsA.forEach(rating => {
+    ratingsMapA[rating.showId] = rating.stars;
+  });
+  
+  ratingsB.forEach(rating => {
+    ratingsMapB[rating.showId] = rating.stars;
+  });
 
-  // Need at least 3 mutual ratings to calculate compatibility
-  if (mutualRatings.length < 3) {
-    return null;
-  }
+  // Use the improved compatibility calculation with hybrid method
+  const compatibilityScore = computeCompatibility(ratingsMapA, ratingsMapB, {
+    method: "hybrid",           // Use hybrid method for best of both worlds
+    ratingMin: 1,               // ShowSwap uses 1-5 star ratings
+    ratingMax: 5,
+    minOverlap: 3,              // Need at least 3 shows in common
+    hybridMinOverlap: 10,       // Use correlation when 10+ shows in common
+    hybridWeight: 0.25,         // 25% correlation, 75% weighted similarity
+    decimalPlaces: 0            // Return integer percentage
+  });
 
-  // Calculate mean absolute difference
-  const differences = mutualRatings.map(m => Math.abs(m.starsA - m.starsB));
-  const meanAbsoluteDifference = differences.reduce((sum, diff) => sum + diff, 0) / differences.length;
-  
-  // Convert to compatibility score (0-100)
-  // MAD of 0 = 100% compatibility, MAD of 4 = 0% compatibility
-  const compatibilityScore = Math.round(100 * (1 - meanAbsoluteDifference / 4));
-  
-  return Math.max(0, Math.min(100, compatibilityScore));
+  // Return null if below minimum overlap (handled by computeCompatibility)
+  return compatibilityScore === 0 ? null : compatibilityScore;
 }
 
 // Endpoint to recalculate compatibilities (for testing/debugging)
@@ -966,6 +963,76 @@ app.post('/api/debug/recalculate-compatibility', async (req, res) => {
   } catch (error) {
     console.error('Recalculate compatibility error:', error);
     res.status(500).json({ error: 'Failed to recalculate compatibility' });
+  }
+});
+
+// Test different compatibility calculation methods
+app.post('/api/debug/test-compatibility/:userId', async (req, res) => {
+  try {
+    const currentUserId = (req.session as any)?.userId;
+    if (!currentUserId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { userId: targetUserId } = req.params;
+    
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'Target user ID is required' });
+    }
+
+    // Get ratings for both users
+    const [ratingsA, ratingsB] = await Promise.all([
+      prisma.rating.findMany({ 
+        where: { userId: currentUserId }, 
+        select: { showId: true, stars: true } 
+      }),
+      prisma.rating.findMany({ 
+        where: { userId: targetUserId }, 
+        select: { showId: true, stars: true } 
+      }),
+    ]);
+
+    // Get target user info
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { username: true }
+    });
+
+    // Convert to RatingMap format
+    const ratingsMapA: RatingMap = {};
+    const ratingsMapB: RatingMap = {};
+    
+    ratingsA.forEach(rating => {
+      ratingsMapA[rating.showId] = rating.stars;
+    });
+    
+    ratingsB.forEach(rating => {
+      ratingsMapB[rating.showId] = rating.stars;
+    });
+
+    // Calculate using different methods
+    const results = {
+      targetUser: targetUser?.username || 'Unknown',
+      mutualShows: Object.keys(ratingsMapA).filter(showId => ratingsMapB[showId]).length,
+      methods: {
+        weighted: computeCompatibility(ratingsMapA, ratingsMapB, { method: "weighted" }),
+        correlation: computeCompatibility(ratingsMapA, ratingsMapB, { method: "correlation" }),
+        hybrid: computeCompatibility(ratingsMapA, ratingsMapB, { method: "hybrid" }),
+        // Also test with different parameters
+        hybridStrict: computeCompatibility(ratingsMapA, ratingsMapB, { 
+          method: "hybrid", 
+          minOverlap: 5,
+          hybridMinOverlap: 15,
+          hybridWeight: 0.4 
+        })
+      }
+    };
+
+    res.json(results);
+
+  } catch (error) {
+    console.error('Test compatibility error:', error);
+    res.status(500).json({ error: 'Failed to test compatibility methods' });
   }
 });
 
