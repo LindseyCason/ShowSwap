@@ -618,7 +618,7 @@ app.get('/api/dashboard', async (req, res) => {
       orderBy: { addedAt: 'desc' }
     });
 
-    // Get compatible friends (people I follow, sorted by compatibility)
+    // Get binge buddies (people I follow, sorted by compatibility)
     const following = await prisma.follow.findMany({
       where: { followerId: userId },
       include: {
@@ -648,7 +648,7 @@ app.get('/api/dashboard', async (req, res) => {
       compatibilityMap.set(friendId, comp.score);
     });
 
-    // Get top 3 compatible people I follow
+    // Get top 3 binge buddies I follow
     const compatibleFriends = following
       .map(follow => ({
         friend: follow.following,

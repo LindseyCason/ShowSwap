@@ -304,7 +304,7 @@ export default function Friends() {
                 onClick={handleRecalculateCompatibility}
                 className="px-3 py-1 text-xs font-medium text-orange-600 bg-orange-50 rounded-md hover:bg-orange-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors"
               >
-                🔄 Recalculate Compatibility
+                🔄 Recalculate Binge Bonds
               </button>
               <button
                 onClick={handleFindFriendsClick}
@@ -343,7 +343,7 @@ export default function Friends() {
                           )}
                         </div>
                         <p className="text-sm text-green-600 font-medium">
-                          {friend.compatibility}% compatibility
+                          {friend.compatibility}% binge bond
                         </p>
                       </div>
                     </div>

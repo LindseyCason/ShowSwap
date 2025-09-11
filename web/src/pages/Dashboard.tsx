@@ -253,7 +253,7 @@ export default function Dashboard() {
             <p className="text-gray-600">Loading your show recommendations...</p>
           </div>
           <div className="space-y-6">
-            <LoadingCard title="Compatible Friends" />
+            <LoadingCard title="Binge Buddies" />
             <LoadingCard title="Now Watching" />
             <LoadingCard title="Next Up" />
           </div>
@@ -333,12 +333,12 @@ export default function Dashboard() {
         )}
 
         <div className="space-y-6">
-          {/* Compatible Friends Row */}
+          {/* Binge Buddies Row */}
           <PaginatedTile
-            title="Compatible Friends"
+            title="Binge Buddies"
             data={dashboardData?.compatibleFriends || []}
             onItemClick={(friendData) => handleUserClick(friendData.friend, friendData.compatibility)}
-            emptyMessage="No compatible friends found"
+            emptyMessage="No binge buddies found"
             renderItem={(friendData: CompatibleFriend) => (
               <div className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors">
                 <div className="flex items-center space-x-3">

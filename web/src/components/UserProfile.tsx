@@ -157,11 +157,11 @@ export default function UserProfile({
           </div>
           
           <div className="mt-4 flex space-x-4">
-            {/* Compatibility Score - Left Side */}
+            {/* Binge Bond - Left Side */}
             {compatibility !== undefined && compatibility !== null ? (
               compatibility > 0 ? (
                 <div className="flex-1 p-4 bg-green-50 rounded-lg border border-green-200">
-                  <h4 className="text-sm font-medium text-green-800 mb-2">Compatibility Score</h4>
+                  <h4 className="text-sm font-medium text-green-800 mb-2">Binge Bond</h4>
                   <div className="flex items-center justify-center">
                     <div className="relative w-20 h-20">
                       <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 100 100">
@@ -196,7 +196,7 @@ export default function UserProfile({
                 </div>
               ) : (
                 <div className="flex-1 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <h4 className="text-sm font-medium text-gray-800 mb-2">Compatibility Score</h4>
+                  <h4 className="text-sm font-medium text-gray-800 mb-2">Binge Bond</h4>
                   <div className="flex items-center justify-center">
                     <div className="relative w-20 h-20">
                       <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 100 100">
@@ -234,7 +234,7 @@ export default function UserProfile({
                     <div>
                       <p className="font-medium text-blue-900">{mostCompatibleFriend.friend.username}</p>
                       <p className="text-xs text-blue-600">
-                        {mostCompatibleFriend.compatibility}% compatible with {user.username}
+                        {mostCompatibleFriend.compatibility}% binge bond with {user.username}
                       </p>
                     </div>
                   </div>
