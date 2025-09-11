@@ -14,6 +14,15 @@ interface UserProfileProps {
     compatibility: number;
   } | null
   onViewProfile?: (userId: string) => void
+  onFollow?: (userId: string) => Promise<void>
+  relationship?: 'following' | 'follower' | null
+  onFollowSuccess?: () => void
+}
+
+// Add local state for suggested friend follow loading and error
+interface SuggestedFriendFollowState {
+  loading: boolean;
+  error: string | null;
 }
 
 export default function UserProfile({ 
@@ -23,13 +32,21 @@ export default function UserProfile({
   userShows, 
   compatibility, 
   mostCompatibleFriend,
-  onViewProfile 
+  onViewProfile,
+  onFollow,
+  relationship,
+  onFollowSuccess 
 }: UserProfileProps) {
   const queryClient = useQueryClient()
   const [currentUserShows, setCurrentUserShows] = useState<(ShowWithRating & { status: string })[]>([])
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({})
   const [successMessages, setSuccessMessages] = useState<Record<string, string>>({})
+  const [followLoading, setFollowLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(0)
+
+  // Suggested friend follow state
+  const [suggestedFriendFollow, setSuggestedFriendFollow] = useState<SuggestedFriendFollowState>({ loading: false, error: null })
 
   // Pagination calculations
   const itemsPerPage = 5;
@@ -48,6 +65,27 @@ export default function UserProfile({
   const handleNext = () => {
     if (!isLastPage) {
       setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handleFollowClick = async () => {
+    if (!onFollow || !user?.id) return;
+    
+    setFollowLoading(true);
+    setErrorMessage(null); // Clear any previous errors
+    try {
+      await onFollow(user.id);
+      // Trigger the success callback to update the parent component
+      if (onFollowSuccess) {
+        onFollowSuccess();
+      }
+    } catch (error) {
+      console.error('Failed to follow user:', error);
+      setErrorMessage('Failed to follow user. Please try again.');
+      // Auto-hide error after 5 seconds
+      setTimeout(() => setErrorMessage(null), 5000);
+    } finally {
+      setFollowLoading(false);
     }
   };
 
@@ -127,7 +165,6 @@ export default function UserProfile({
       setLoadingStates(prev => ({ ...prev, [showId]: false }))
     }
   }
-  
   if (!isOpen || !user) return null
 
   return (
@@ -157,12 +194,34 @@ export default function UserProfile({
             </button>
           </div>
           
+          {/* Error Toast */}
+          {errorMessage && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <svg className="w-4 h-4 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-sm text-red-700">{errorMessage}</p>
+                </div>
+                <button
+                  onClick={() => setErrorMessage(null)}
+                  className="text-red-400 hover:text-red-600"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="mt-4 flex space-x-4">
-            {/* Compatibility Score - Left Side */}
+            {/* Binge Bond - Left Side */}
             {compatibility !== undefined && compatibility !== null ? (
               compatibility > 0 ? (
                 <div className="flex-1 p-4 bg-green-50 rounded-lg border border-green-200">
-                  <h4 className="text-sm font-medium text-green-800 mb-2">Compatibility Score</h4>
+                  <h4 className="text-sm font-medium text-green-800 mb-2">Binge Bond</h4>
                   <div className="flex items-center justify-center">
                     <div className="relative w-20 h-20">
                       <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 100 100">
@@ -196,26 +255,44 @@ export default function UserProfile({
                   </div>
                 </div>
               ) : (
-                <div className="flex-1 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <h4 className="text-sm font-medium text-gray-800 mb-2">Compatibility Score</h4>
-                  <div className="flex items-center justify-center">
-                    <div className="relative w-20 h-20">
-                      <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 100 100">
-                        {/* Background circle */}
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="40"
-                          stroke="rgb(229 231 235)"
-                          strokeWidth="8"
-                          fill="transparent"
-                        />
-                        {/* No progress circle for 0% */}
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-lg font-bold text-gray-600">0%</span>
+                <div className="flex-1 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h4 className="text-sm font-medium text-blue-800 mb-2">Binge Bond</h4>
+                  <div className="flex flex-col items-center justify-center space-y-3">
+                    {relationship === 'following' ? (
+                      // Already following but 0% compatibility - show encouraging message
+                      <div className="text-center">
+                        <p className="text-sm text-blue-700 mb-1">No shared shows yet</p>
+                        <p className="text-xs text-blue-600">Try watching some of their shows!</p>
                       </div>
-                    </div>
+                    ) : (
+                      // Not following - show follow prompt and button
+                      <>
+                        <p className="text-sm text-blue-700 text-center">Follow to see Binge Bond %</p>
+                        {onFollow && (
+                          <button
+                            onClick={handleFollowClick}
+                            disabled={followLoading}
+                            className={`text-xs px-4 py-2 rounded-md transition-colors ${
+                              followLoading 
+                                ? 'bg-blue-400 text-white cursor-not-allowed' 
+                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                            }`}
+                          >
+                            {followLoading ? (
+                              <div className="flex items-center space-x-1">
+                                <span>Following</span>
+                                <div className="flex space-x-1">
+                                  <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                  <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                  <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                </div>
+                                <span className="text-xs">🍿</span>
+                              </div>
+                            ) : 'Follow'}
+                          </button>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
               )
@@ -226,31 +303,91 @@ export default function UserProfile({
               <div className="flex-1 p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <h4 className="text-sm font-medium text-blue-800 mb-2">Suggested Friend</h4>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                      <span className="text-sm font-bold text-blue-600">
-                        {mostCompatibleFriend.friend.username.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
+                  <div className="flex items-center space-x-4">
                     <div>
                       <p className="font-medium text-blue-900">{mostCompatibleFriend.friend.username}</p>
-                      <p className="text-xs text-blue-600">
-                        {mostCompatibleFriend.compatibility}% compatible with {user.username}
-                      </p>
+                    </div>
+                    <div className="relative w-12 h-12">
+                      <svg className="w-12 h-12 transform -rotate-90" viewBox="0 0 100 100">
+                        {/* Background circle */}
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          stroke="rgb(219 234 254)"
+                          strokeWidth="8"
+                          fill="transparent"
+                        />
+                        {/* Progress circle */}
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          stroke="rgb(59 130 246)"
+                          strokeWidth="8"
+                          fill="transparent"
+                          strokeLinecap="round"
+                          strokeDasharray={`${2 * Math.PI * 40}`}
+                          strokeDashoffset={`${2 * Math.PI * 40 * (1 - mostCompatibleFriend.compatibility / 100)}`}
+                          className="transition-all duration-300 ease-in-out"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-sm font-bold text-blue-600">{mostCompatibleFriend.compatibility}%</span>
+                      </div>
                     </div>
                   </div>
-                  {onViewProfile && (
-                    <button
-                      onClick={() => onViewProfile(mostCompatibleFriend.friend.id)}
-                      className="text-xs bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors"
-                    >
-                      View Profile
-                    </button>
-                  )}
+                  <div className="flex space-x-2">
+                    {onViewProfile && (
+                      <button
+                        onClick={() => onViewProfile(mostCompatibleFriend.friend.id)}
+                        className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-md hover:bg-blue-200 transition-colors"
+                      >
+                        Profile
+                      </button>
+                    )}
+                    {onFollow && (
+                      <div className="flex flex-col items-end space-y-1">
+                        <button
+                          onClick={async () => {
+                            setSuggestedFriendFollow({ loading: true, error: null });
+                            try {
+                              await onFollow(mostCompatibleFriend.friend.id);
+                              if (onFollowSuccess) onFollowSuccess();
+                            } catch (error) {
+                              setSuggestedFriendFollow({
+                                loading: false,
+                                error: 'Failed to follow user. Please try again.'
+                              });
+                              setTimeout(() => setSuggestedFriendFollow(s => ({ ...s, error: null })), 5000);
+                              return;
+                            }
+                            setSuggestedFriendFollow({ loading: false, error: null });
+                          }}
+                          disabled={suggestedFriendFollow.loading}
+                          className={`text-xs bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700 transition-colors ${
+                            suggestedFriendFollow.loading ? 'opacity-60 cursor-not-allowed' : ''
+                          }`}
+                        >
+                          {suggestedFriendFollow.loading ? (
+                            <div className="flex items-center space-x-1">
+                              <span>Following</span>
+                              <div className="flex space-x-1">
+                                <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                <div className="w-1 h-1 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                              </div>
+                              <span className="text-xs">🍿</span>
+                            </div>
+                          ) : 'Follow'}
+                        </button>
+                        {suggestedFriendFollow.error && (
+                          <span className="text-xs text-red-600">{suggestedFriendFollow.error}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <p className="text-xs text-blue-600 mt-2">
-                  Most similar viewing preferences - consider following for great recommendations!
-                </p>
               </div>
             ) : (
               <div className="flex-1 p-4 bg-gray-50 rounded-lg border border-gray-200">

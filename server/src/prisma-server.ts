@@ -3,10 +3,21 @@ import cors from 'cors';
 import session from 'express-session';
 import { PrismaClient } from '@prisma/client';
 import path from 'path';
+import { computeCompatibility, type RatingMap, type CompatibilityOptions } from './lib/compatibility';
+import { 
+  computeDirectionalCompatibility, 
+  PrismaRatingsRepo, 
+  PrismaSocialRepo,
+  type DirectionalCompatibilityResult 
+} from './lib/directional-compatibility';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const prisma = new PrismaClient();
+
+// Initialize directional compatibility repositories
+const ratingsRepo = new PrismaRatingsRepo(prisma);
+const socialRepo = new PrismaSocialRepo(prisma);
 
 // Type definitions
 // Define valid show statuses
@@ -617,7 +628,7 @@ app.get('/api/dashboard', async (req, res) => {
       orderBy: { addedAt: 'desc' }
     });
 
-    // Get compatible friends (people I follow, sorted by compatibility)
+    // Get binge buddies (people I follow, sorted by compatibility)
     const following = await prisma.follow.findMany({
       where: { followerId: userId },
       include: {
@@ -647,7 +658,7 @@ app.get('/api/dashboard', async (req, res) => {
       compatibilityMap.set(friendId, comp.score);
     });
 
-    // Get top 3 compatible people I follow
+    // Get top 3 binge buddies I follow
     const compatibleFriends = following
       .map(follow => ({
         friend: follow.following,
@@ -823,6 +834,13 @@ app.get('/api/users/:userId/profile', async (req, res) => {
       orderBy: { score: 'desc' }
     });
 
+    // Get the list of users that the current user is already following
+    const currentUserFollowing = await prisma.follow.findMany({
+      where: { followerId: currentUserId },
+      select: { followingId: true }
+    });
+    const followingIds = new Set(currentUserFollowing.map(f => f.followingId));
+
     let mostCompatibleFriend = null;
     let currentUserCompatibility = null;
     
@@ -838,11 +856,12 @@ app.get('/api/users/:userId/profile', async (req, res) => {
       }
       
       // Find the first compatibility that doesn't involve the current logged-in user
+      // and that the current user is not already following
       for (const comp of compatibilities) {
         const friendUser = comp.userAId === userId ? comp.userB : comp.userA;
         
-        // Skip if the friend is the current logged-in user
-        if (friendUser.id !== currentUserId) {
+        // Skip if the friend is the current logged-in user or if already following this user
+        if (friendUser.id !== currentUserId && !followingIds.has(friendUser.id)) {
           mostCompatibleFriend = {
             friend: friendUser,
             compatibility: comp.score
@@ -866,7 +885,21 @@ app.get('/api/users/:userId/profile', async (req, res) => {
   }
 });
 
-// Helper function to calculate compatibility between two users
+/**
+ * Configuration for compatibility calculation between users.
+ * Adjust these values to tune the compatibility algorithm for ShowSwap.
+ */
+const COMPATIBILITY_CONFIG: CompatibilityOptions = {
+  method: "hybrid" as const,  // Use hybrid method for best of both worlds
+  ratingMin: 1,               // ShowSwap uses 1-5 star ratings
+  ratingMax: 5,
+  minOverlap: 3,              // Need at least 3 shows in common
+  hybridMinOverlap: 10,       // Use correlation when 10+ shows in common
+  hybridWeight: 0.25,         // 25% correlation, 75% weighted similarity
+  decimalPlaces: 0            // Return integer percentage
+};
+
+// Helper function to calculate compatibility between two users using improved algorithm
 async function calculateCompatibility(userAId: string, userBId: string) {
   // Get ratings for both users
   const [ratingsA, ratingsB] = await Promise.all([
@@ -880,35 +913,23 @@ async function calculateCompatibility(userAId: string, userBId: string) {
     }),
   ]);
 
-  // Find mutual shows (shows both users have rated)
-  const ratingsMapA = new Map(ratingsA.map(r => [r.showId, r.stars]));
-  const mutualRatings: { showId: string; starsA: number; starsB: number }[] = [];
+  // Convert to RatingMap format expected by the compatibility function
+  const ratingsMapA: RatingMap = {};
+  const ratingsMapB: RatingMap = {};
   
-  for (const ratingB of ratingsB) {
-    const starsA = ratingsMapA.get(ratingB.showId);
-    if (typeof starsA === 'number') {
-      mutualRatings.push({ 
-        showId: ratingB.showId, 
-        starsA: starsA, 
-        starsB: ratingB.stars 
-      });
-    }
-  }
+  ratingsA.forEach(rating => {
+    ratingsMapA[rating.showId] = rating.stars;
+  });
+  
+  ratingsB.forEach(rating => {
+    ratingsMapB[rating.showId] = rating.stars;
+  });
 
-  // Need at least 3 mutual ratings to calculate compatibility
-  if (mutualRatings.length < 3) {
-    return null;
-  }
+  // Use the improved compatibility calculation with configuration constants
+  const compatibilityScore = computeCompatibility(ratingsMapA, ratingsMapB, COMPATIBILITY_CONFIG);
 
-  // Calculate mean absolute difference
-  const differences = mutualRatings.map(m => Math.abs(m.starsA - m.starsB));
-  const meanAbsoluteDifference = differences.reduce((sum, diff) => sum + diff, 0) / differences.length;
-  
-  // Convert to compatibility score (0-100)
-  // MAD of 0 = 100% compatibility, MAD of 4 = 0% compatibility
-  const compatibilityScore = Math.round(100 * (1 - meanAbsoluteDifference / 4));
-  
-  return Math.max(0, Math.min(100, compatibilityScore));
+  // Return null if below minimum overlap (handled by computeCompatibility)
+  return compatibilityScore === 0 ? null : compatibilityScore;
 }
 
 // Endpoint to recalculate compatibilities (for testing/debugging)
@@ -966,6 +987,76 @@ app.post('/api/debug/recalculate-compatibility', async (req, res) => {
   } catch (error) {
     console.error('Recalculate compatibility error:', error);
     res.status(500).json({ error: 'Failed to recalculate compatibility' });
+  }
+});
+
+// Test different compatibility calculation methods
+app.post('/api/debug/test-compatibility/:userId', async (req, res) => {
+  try {
+    const currentUserId = (req.session as any)?.userId;
+    if (!currentUserId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { userId: targetUserId } = req.params;
+    
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'Target user ID is required' });
+    }
+
+    // Get ratings for both users
+    const [ratingsA, ratingsB] = await Promise.all([
+      prisma.rating.findMany({ 
+        where: { userId: currentUserId }, 
+        select: { showId: true, stars: true } 
+      }),
+      prisma.rating.findMany({ 
+        where: { userId: targetUserId }, 
+        select: { showId: true, stars: true } 
+      }),
+    ]);
+
+    // Get target user info
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { username: true }
+    });
+
+    // Convert to RatingMap format
+    const ratingsMapA: RatingMap = {};
+    const ratingsMapB: RatingMap = {};
+    
+    ratingsA.forEach(rating => {
+      ratingsMapA[rating.showId] = rating.stars;
+    });
+    
+    ratingsB.forEach(rating => {
+      ratingsMapB[rating.showId] = rating.stars;
+    });
+
+    // Calculate using different methods
+    const results = {
+      targetUser: targetUser?.username || 'Unknown',
+      mutualShows: Object.keys(ratingsMapA).filter(showId => ratingsMapB[showId]).length,
+      methods: {
+        weighted: computeCompatibility(ratingsMapA, ratingsMapB, { method: "weighted" }),
+        correlation: computeCompatibility(ratingsMapA, ratingsMapB, { method: "correlation" }),
+        hybrid: computeCompatibility(ratingsMapA, ratingsMapB, { method: "hybrid" }),
+        // Also test with different parameters
+        hybridStrict: computeCompatibility(ratingsMapA, ratingsMapB, { 
+          method: "hybrid", 
+          minOverlap: 5,
+          hybridMinOverlap: 15,
+          hybridWeight: 0.4 
+        })
+      }
+    };
+
+    res.json(results);
+
+  } catch (error) {
+    console.error('Test compatibility error:', error);
+    res.status(500).json({ error: 'Failed to test compatibility methods' });
   }
 });
 
@@ -1437,6 +1528,112 @@ app.post('/api/action/watched', async (req, res) => {
   } catch (error) {
     console.error('Watched error:', error);
     res.status(500).json({ error: 'Failed to update status' });
+  }
+});
+
+// Directional Compatibility API Endpoints
+
+// Get directional compatibility score from current user to target user
+app.get('/api/directional-compatibility/:targetUserId', async (req, res) => {
+  try {
+    const currentUserId = (req.session as any)?.userId;
+    if (!currentUserId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { targetUserId } = req.params;
+    
+    const result = await computeDirectionalCompatibility(
+      currentUserId,
+      targetUserId,
+      ratingsRepo,
+      socialRepo
+    );
+
+    res.json(result);
+  } catch (error) {
+    console.error('Directional compatibility error:', error);
+    res.status(500).json({ error: 'Failed to compute directional compatibility' });
+  }
+});
+
+// Get multiple directional compatibility scores for a list of users
+app.post('/api/directional-compatibility/batch', async (req, res) => {
+  try {
+    const currentUserId = (req.session as any)?.userId;
+    if (!currentUserId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { targetUserIds } = req.body;
+    if (!Array.isArray(targetUserIds)) {
+      return res.status(400).json({ error: 'targetUserIds must be an array' });
+    }
+
+    const results: DirectionalCompatibilityResult[] = [];
+    
+    for (const targetUserId of targetUserIds) {
+      const result = await computeDirectionalCompatibility(
+        currentUserId,
+        targetUserId,
+        ratingsRepo,
+        socialRepo
+      );
+      results.push(result);
+    }
+
+    res.json({ results });
+  } catch (error) {
+    console.error('Batch directional compatibility error:', error);
+    res.status(500).json({ error: 'Failed to compute batch directional compatibility' });
+  }
+});
+
+// Get compatibility scores for all users the current user follows
+app.get('/api/directional-compatibility/following', async (req, res) => {
+  try {
+    const currentUserId = (req.session as any)?.userId;
+    if (!currentUserId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Get all users the current user is following
+    const following = await prisma.follow.findMany({
+      where: { followerId: currentUserId },
+      include: {
+        following: { select: { id: true, username: true } }
+      }
+    });
+
+    const results: (DirectionalCompatibilityResult & { user: { id: string; username: string } })[] = [];
+    
+    for (const follow of following) {
+      const result = await computeDirectionalCompatibility(
+        currentUserId,
+        follow.following.id,
+        ratingsRepo,
+        socialRepo
+      );
+      results.push({
+        ...result,
+        user: follow.following
+      });
+    }
+
+    // Sort by score (highest first), then by overlap count
+    results.sort((a, b) => {
+      if (a.score && b.score) {
+        return b.score - a.score;
+      }
+      if (a.score && !b.score) return -1;
+      if (!a.score && b.score) return 1;
+      return b.overlapCount - a.overlapCount;
+    });
+
+    res.json({ results });
+  } catch (error) {
+    console.error('Following directional compatibility error:', error);
+    res.status(500).json({ error: 'Failed to compute following directional compatibility' });
   }
 });
 

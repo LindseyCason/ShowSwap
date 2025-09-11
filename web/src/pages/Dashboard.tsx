@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { useDashboard, useNewFollowers } from '../lib/hooks'
+import { useDashboard, useNewFollowers, useFollow } from '../lib/hooks'
 import { useAuth } from '../lib/UserContext'
 import UserProfile from '../components/UserProfile'
 import RatingModal from '../components/RatingModal'
@@ -140,6 +140,9 @@ export default function Dashboard() {
   // New followers notification
   const { data: newFollowersData, loading: newFollowersLoading, refetch: refetchNewFollowers } = useNewFollowers();
 
+  // Follow functionality
+  const { followUser: followUserAction } = useFollow();
+
   // User profile modal state
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [profileShows, setProfileShows] = useState<ShowWithRating[]>([]);
@@ -192,6 +195,24 @@ export default function Dashboard() {
     setProfileShows([]);
     setCompatibility(undefined);
     setMostCompatibleFriend(null);
+  };
+
+  const handleFollow = async (userId: string) => {
+    try {
+      await followUserAction(userId);
+      // Optionally refetch dashboard data to update the suggestions
+      refetchDashboard();
+    } catch (error) {
+      console.error('Failed to follow user:', error);
+      // Re-throw error so UserProfile can handle it
+      throw error;
+    }
+  };
+
+  const handleFollowSuccess = async () => {
+    // For Dashboard, we don't have selectedUser state like Friends.tsx
+    // Just refetch dashboard data
+    refetchDashboard();
   };
 
   const handleWatchNow = async (showId: string) => {
@@ -253,7 +274,7 @@ export default function Dashboard() {
             <p className="text-gray-600">Loading your show recommendations...</p>
           </div>
           <div className="space-y-6">
-            <LoadingCard title="Compatible Friends" />
+            <LoadingCard title="Binge Buddies" />
             <LoadingCard title="Now Watching" />
             <LoadingCard title="Next Up" />
           </div>
@@ -333,12 +354,12 @@ export default function Dashboard() {
         )}
 
         <div className="space-y-6">
-          {/* Compatible Friends Row */}
+          {/* Binge Buddies Row */}
           <PaginatedTile
-            title="Compatible Friends"
+            title="Binge Buddies"
             data={dashboardData?.compatibleFriends || []}
             onItemClick={(friendData) => handleUserClick(friendData.friend, friendData.compatibility)}
-            emptyMessage="No compatible friends found"
+            emptyMessage="No binge buddies found"
             renderItem={(friendData: CompatibleFriend) => (
               <div className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors">
                 <div className="flex items-center space-x-3">
@@ -465,6 +486,9 @@ export default function Dashboard() {
             handleUserClick(mostCompatibleFriend.friend, mostCompatibleFriend.compatibility);
           }
         }}
+        onFollow={handleFollow}
+        relationship={null}
+        onFollowSuccess={handleFollowSuccess}
       />
 
       {/* Rating Modal */}
