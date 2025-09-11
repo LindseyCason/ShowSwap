@@ -4,10 +4,20 @@ import session from 'express-session';
 import { PrismaClient } from '@prisma/client';
 import path from 'path';
 import { computeCompatibility, type RatingMap } from './lib/compatibility';
+import { 
+  computeDirectionalCompatibility, 
+  PrismaRatingsRepo, 
+  PrismaSocialRepo,
+  type DirectionalCompatibilityResult 
+} from './lib/directional-compatibility';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const prisma = new PrismaClient();
+
+// Initialize directional compatibility repositories
+const ratingsRepo = new PrismaRatingsRepo(prisma);
+const socialRepo = new PrismaSocialRepo(prisma);
 
 // Type definitions
 // Define valid show statuses
@@ -824,6 +834,13 @@ app.get('/api/users/:userId/profile', async (req, res) => {
       orderBy: { score: 'desc' }
     });
 
+    // Get the list of users that the current user is already following
+    const currentUserFollowing = await prisma.follow.findMany({
+      where: { followerId: currentUserId },
+      select: { followingId: true }
+    });
+    const followingIds = new Set(currentUserFollowing.map(f => f.followingId));
+
     let mostCompatibleFriend = null;
     let currentUserCompatibility = null;
     
@@ -839,11 +856,12 @@ app.get('/api/users/:userId/profile', async (req, res) => {
       }
       
       // Find the first compatibility that doesn't involve the current logged-in user
+      // and that the current user is not already following
       for (const comp of compatibilities) {
         const friendUser = comp.userAId === userId ? comp.userB : comp.userA;
         
-        // Skip if the friend is the current logged-in user
-        if (friendUser.id !== currentUserId) {
+        // Skip if the friend is the current logged-in user or if already following this user
+        if (friendUser.id !== currentUserId && !followingIds.has(friendUser.id)) {
           mostCompatibleFriend = {
             friend: friendUser,
             compatibility: comp.score
@@ -1504,6 +1522,112 @@ app.post('/api/action/watched', async (req, res) => {
   } catch (error) {
     console.error('Watched error:', error);
     res.status(500).json({ error: 'Failed to update status' });
+  }
+});
+
+// Directional Compatibility API Endpoints
+
+// Get directional compatibility score from current user to target user
+app.get('/api/directional-compatibility/:targetUserId', async (req, res) => {
+  try {
+    const currentUserId = (req.session as any)?.userId;
+    if (!currentUserId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { targetUserId } = req.params;
+    
+    const result = await computeDirectionalCompatibility(
+      currentUserId,
+      targetUserId,
+      ratingsRepo,
+      socialRepo
+    );
+
+    res.json(result);
+  } catch (error) {
+    console.error('Directional compatibility error:', error);
+    res.status(500).json({ error: 'Failed to compute directional compatibility' });
+  }
+});
+
+// Get multiple directional compatibility scores for a list of users
+app.post('/api/directional-compatibility/batch', async (req, res) => {
+  try {
+    const currentUserId = (req.session as any)?.userId;
+    if (!currentUserId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { targetUserIds } = req.body;
+    if (!Array.isArray(targetUserIds)) {
+      return res.status(400).json({ error: 'targetUserIds must be an array' });
+    }
+
+    const results: DirectionalCompatibilityResult[] = [];
+    
+    for (const targetUserId of targetUserIds) {
+      const result = await computeDirectionalCompatibility(
+        currentUserId,
+        targetUserId,
+        ratingsRepo,
+        socialRepo
+      );
+      results.push(result);
+    }
+
+    res.json({ results });
+  } catch (error) {
+    console.error('Batch directional compatibility error:', error);
+    res.status(500).json({ error: 'Failed to compute batch directional compatibility' });
+  }
+});
+
+// Get compatibility scores for all users the current user follows
+app.get('/api/directional-compatibility/following', async (req, res) => {
+  try {
+    const currentUserId = (req.session as any)?.userId;
+    if (!currentUserId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Get all users the current user is following
+    const following = await prisma.follow.findMany({
+      where: { followerId: currentUserId },
+      include: {
+        following: { select: { id: true, username: true } }
+      }
+    });
+
+    const results: (DirectionalCompatibilityResult & { user: { id: string; username: string } })[] = [];
+    
+    for (const follow of following) {
+      const result = await computeDirectionalCompatibility(
+        currentUserId,
+        follow.following.id,
+        ratingsRepo,
+        socialRepo
+      );
+      results.push({
+        ...result,
+        user: follow.following
+      });
+    }
+
+    // Sort by score (highest first), then by overlap count
+    results.sort((a, b) => {
+      if (a.score && b.score) {
+        return b.score - a.score;
+      }
+      if (a.score && !b.score) return -1;
+      if (!a.score && b.score) return 1;
+      return b.overlapCount - a.overlapCount;
+    });
+
+    res.json({ results });
+  } catch (error) {
+    console.error('Following directional compatibility error:', error);
+    res.status(500).json({ error: 'Failed to compute following directional compatibility' });
   }
 });
 

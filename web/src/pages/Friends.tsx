@@ -19,6 +19,7 @@ export default function Friends() {
   const [profileShows, setProfileShows] = useState<ShowWithRating[]>([])
   const [profileLoading, setProfileLoading] = useState(false)
   const [compatibility, setCompatibility] = useState<number | undefined>(undefined)
+  const [selectedUserRelationship, setSelectedUserRelationship] = useState<'following' | 'follower' | null>(null)
 
   // Search state
   const [isSearching, setIsSearching] = useState(false)
@@ -45,6 +46,34 @@ export default function Friends() {
       } catch (error) {
         console.error('Failed to mark followers as checked:', error)
       }
+    }
+  }
+
+  const handleFollow = async (userId: string) => {
+    try {
+      await followUserAction(userId)
+      // Refetch friends list to update the data
+      refetch()
+    } catch (error) {
+      console.error('Failed to follow user:', error)
+      // Re-throw error so UserProfile can handle it
+      throw error
+    }
+  }
+
+  const handleFollowSuccess = async () => {
+    if (!selectedUser) return;
+    
+    try {
+      // Update relationship status immediately
+      setSelectedUserRelationship('following')
+      
+      // Refetch the user's profile to get updated compatibility score
+      const profileData = await getUserProfile(selectedUser.id)
+      setCompatibility(profileData.compatibility || 0)
+      setProfileShows(profileData.shows)
+    } catch (error) {
+      console.error('Failed to refresh profile after follow:', error)
     }
   }
 
@@ -192,6 +221,7 @@ export default function Friends() {
       createdAt: new Date().toISOString()
     }
     setSelectedUser(userForModal)
+    setSelectedUserRelationship(friend.relationship || null)
     
     try {
       const profileData = await getUserProfile(friend.id)
@@ -210,6 +240,7 @@ export default function Friends() {
     setSelectedUser(null)
     setProfileShows([])
     setCompatibility(undefined)
+    setSelectedUserRelationship(null)
   }
 
   if (loading) {
@@ -342,9 +373,11 @@ export default function Friends() {
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-green-600 font-medium">
-                          {friend.compatibility}% binge bond
-                        </p>
+                        {friend.compatibility > 0 && (
+                          <p className="text-sm text-green-600 font-medium">
+                            {friend.compatibility}% binge bond
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center space-x-3">
@@ -473,6 +506,9 @@ export default function Friends() {
         userShows={profileShows}
         compatibility={compatibility}
         mostCompatibleFriend={null}
+        onFollow={handleFollow}
+        relationship={selectedUserRelationship}
+        onFollowSuccess={handleFollowSuccess}
       />
 
       {/* Unfollow Confirmation Modal */}
