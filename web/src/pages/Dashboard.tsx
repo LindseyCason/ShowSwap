@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import CompatibilityBadge from '../components/CompatibilityBadge'
 import { useDashboard, useNewFollowers, useFollow } from '../lib/hooks'
 import { useAuth } from '../lib/UserContext'
 import UserProfile from '../components/UserProfile'
@@ -373,9 +374,11 @@ export default function Dashboard() {
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-sm font-medium text-green-600">
-                    {friendData.compatibility}%
-                  </span>
+                  <CompatibilityBadge 
+                    score={friendData.compatibility} 
+                    size="sm"
+                    showLabel={false}
+                  />
                   <span className="text-gray-400 text-sm">→</span>
                 </div>
               </div>
