@@ -76,15 +76,13 @@ export function CompatibilityText({
       className={className}
       style={{ color: bucket.color }}
     >
-      {showPercentage && showLabel ? (
-        `${score}% ${bucket.label}`
-      ) : showPercentage ? (
-        `${score}%`
-      ) : showLabel ? (
-        bucket.label
-      ) : (
-        `${score}%`
-      )}
+      {showPercentage && showLabel
+        ? `${score}% ${bucket.label}`
+        : showPercentage
+        ? `${score}%`
+        : showLabel
+        ? bucket.label
+        : null}
     </span>
   );
 }

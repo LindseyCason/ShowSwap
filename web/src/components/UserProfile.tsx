@@ -4,6 +4,11 @@ import type { User, ShowWithRating, Friend } from '../lib/api'
 import { addShowToWatch, getCurrentUserShows } from '../lib/api'
 import { bucketCompatibility } from '../lib/compatibility-buckets'
 
+// Helper function to capitalize username
+const capitalizeUsername = (username: string): string => {
+  return username.charAt(0).toUpperCase() + username.slice(1).toLowerCase();
+};
+
 interface UserProfileProps {
   user: User | null
   isOpen: boolean
@@ -181,7 +186,7 @@ export default function UserProfile({
                 </span>
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-900">{user.username}</h2>
+                <h2 className="text-xl font-bold text-gray-900">{capitalizeUsername(user.username)}</h2>
                 <p className="text-sm text-gray-500">
                   Joined {new Date(user.createdAt).toLocaleDateString()}
                 </p>
@@ -317,7 +322,7 @@ export default function UserProfile({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center justify-between">
                     <div className="flex flex-col items-start space-y-1">
-                      <p className="font-medium text-blue-900">{mostCompatibleFriend.friend.username}</p>
+                      <p className="font-medium text-blue-900">{capitalizeUsername(mostCompatibleFriend.friend.username)}</p>
                       {(() => {
                         const bucket = bucketCompatibility(mostCompatibleFriend.compatibility);
                         return (
@@ -433,7 +438,7 @@ export default function UserProfile({
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">
-                  {user.username}'s Shows ({userShows.length})
+                  {capitalizeUsername(user.username)}'s Shows ({userShows.length})
                 </h3>
                 {!isOnlyOnePage && (
                   <div className="flex items-center space-x-2">
@@ -537,7 +542,7 @@ export default function UserProfile({
             <div className="text-center py-8">
               <p className="text-gray-500">No shows to display</p>
               <p className="text-sm text-gray-400 mt-1">
-                {user.username} hasn't added any shows yet
+                {capitalizeUsername(user.username)} hasn't added any shows yet
               </p>
             </div>
           )}
